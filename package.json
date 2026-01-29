@@ -10,7 +10,13 @@
     "migrate:remote": "wrangler d1 execute bookmarks-db --remote --file=./schema.sql && wrangler d1 execute bookmarks-db --remote --file=./migrations/002_add_indexes.sql",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["bookmarks", "cloudflare", "workers", "d1", "hono"],
+  "keywords": [
+    "bookmarks",
+    "cloudflare",
+    "workers",
+    "d1",
+    "hono"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -19,7 +25,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.11.1",
     "@cloudflare/workers-types": "^4.20251121.0",
-    "vitest": "^4.0.16",
+    "vitest": "^3.2.4",
     "wrangler": "^4.50.0"
   }
 }
