@@ -103,6 +103,11 @@ header {
     justify-content: center;
 }
 
+.btn-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
 .btn-icon:hover {
     background: var(--primary-light);
     color: var(--primary);
@@ -111,6 +116,34 @@ header {
 .btn-logout:hover {
     background: rgba(239, 68, 68, 0.1);
     color: #ef4444;
+}
+
+/* Sizing Utilities */
+.w-4 {
+    width: 16px;
+    height: 16px;
+}
+
+.h-4 {
+    height: 16px;
+}
+
+.w-5 {
+    width: 20px;
+    height: 20px;
+}
+
+.h-5 {
+    height: 20px;
+}
+
+.w-6 {
+    width: 24px;
+    height: 24px;
+}
+
+.h-6 {
+    height: 24px;
 }
 
 /* Tabs */
