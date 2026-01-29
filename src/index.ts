@@ -96,22 +96,73 @@ app.use('/api/*', async (c, next) => {
 app.use('*', async (c, next) => {
     const config = getConfig(c.env);
 
-    // Init default settings if not exists
+    // 1. 自动检测并初始化数据库表结构 (真正的“一键部署”自愈逻辑)
     try {
-        const { results } = await c.env.DB.prepare('SELECT * FROM settings WHERE key = ?').bind('username').all();
-        if (results.length === 0) {
+        // 尝试查询 settings 表,如果失败则说明数据库未初始化
+        await c.env.DB.prepare('SELECT 1 FROM settings LIMIT 1').first();
+    } catch (e) {
+        console.log('Database not initialized. Starting auto-initialization...');
+        try {
+            // 执行完整初始化 SQL
+            const initSql = [
+                `CREATE TABLE IF NOT EXISTS folders (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    parent_id INTEGER,
+                    sort_order INTEGER DEFAULT 0,
+                    is_deleted INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (parent_id) REFERENCES folders(id) ON DELETE CASCADE
+                )`,
+                `CREATE TABLE IF NOT EXISTS bookmarks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    description TEXT,
+                    folder_id INTEGER,
+                    is_deleted INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
+                )`,
+                `CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )`,
+                // 索引优化
+                `CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON folders(parent_id) WHERE is_deleted = 0`,
+                `CREATE INDEX IF NOT EXISTS idx_folders_is_deleted ON folders(is_deleted)`,
+                `CREATE INDEX IF NOT EXISTS idx_folders_sort_order ON folders(sort_order ASC, name ASC) WHERE is_deleted = 0`,
+                `CREATE INDEX IF NOT EXISTS idx_bookmarks_folder_id ON bookmarks(folder_id) WHERE is_deleted = 0`,
+                `CREATE INDEX IF NOT EXISTS idx_bookmarks_is_deleted ON bookmarks(is_deleted)`,
+                `CREATE INDEX IF NOT EXISTS idx_bookmarks_created_at ON bookmarks(created_at DESC) WHERE is_deleted = 0`,
+                `CREATE INDEX IF NOT EXISTS idx_bookmarks_url_folder ON bookmarks(url, folder_id)`
+            ];
+
+            for (const sql of initSql) {
+                await c.env.DB.prepare(sql).run();
+            }
+            console.log('Database initialized successfully.');
+        } catch (initErr) {
+            console.error('Database auto-initialization failed:', initErr);
+        }
+    }
+
+    // 2. 初始化默认配置 (如果需要)
+    try {
+        const results = await c.env.DB.prepare('SELECT * FROM settings WHERE key = ?').bind('username').first();
+        if (!results) {
             const defaultPassHash = await hashPassword('12345');
             await c.env.DB.prepare('INSERT INTO settings (key, value) VALUES (?, ?), (?, ?)').bind('username', 'admin', 'password', defaultPassHash).run();
         }
     } catch (e) {
-        // Ignore error if table doesn't exist yet (will be created by d1 execute)
+        // 忽略,由步骤1处理
     }
 
-    // Migration: Ensure sort_order column exists in folders
+    // 3. 字段迁移 (确保旧版本兼容)
     try {
         await c.env.DB.prepare('ALTER TABLE folders ADD COLUMN sort_order INTEGER DEFAULT 0').run();
     } catch (e) {
-        // Ignore error if column already exists
+        // 忽略,说明列已存在
     }
 
     // Public routes

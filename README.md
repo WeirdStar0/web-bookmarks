@@ -131,7 +131,7 @@ npm run deploy
 
 **部署后的关键步骤：**
 1. **设置密钥**：在 Cloudflare Dashboard 的 Workers 设置中添加环境变量 `SECRET_KEY`（[如何生成？](#1-生成安全密钥-secret_key)）。
-2. **初始化数据库**：在本地运行 `npm run migrate:remote` 以创建表结构（需要先执行 `npx wrangler login`）。
+   *   *注：数据库表结构和索引会在您首次访问页面时自动初始化，无需手动操作。*
 
 ---
 
