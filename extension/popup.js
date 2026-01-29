@@ -11,6 +11,9 @@ const settingsView = document.getElementById('settingsView');
 const settingsForm = document.getElementById('settingsForm');
 const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
 const serverUrlInput = document.getElementById('serverUrl');
+const themeToggleBtn = document.getElementById('themeToggleBtn');
+const themeSun = themeToggleBtn.querySelector('.theme-sun');
+const themeMoon = themeToggleBtn.querySelector('.theme-moon');
 
 const loginView = document.getElementById('loginView');
 const mainView = document.getElementById('mainView');
@@ -30,13 +33,17 @@ const searchResults = document.getElementById('searchResults');
 
 // Initialization
 document.addEventListener('DOMContentLoaded', async () => {
-    // Apply Dark Mode automatically based on system preference
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        document.documentElement.classList.add('dark');
-    }
-
     // Load config
-    const config = await chrome.storage.local.get(['apiBase', 'token', 'lastFolderId']);
+    const config = await chrome.storage.local.get(['apiBase', 'token', 'lastFolderId', 'theme']);
+
+    // Apply Theme
+    if (config.theme) {
+        setTheme(config.theme);
+    } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        setTheme('dark');
+    } else {
+        setTheme('light');
+    }
 
     if (config.apiBase) {
         API_BASE = config.apiBase;
@@ -60,6 +67,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 });
+
+// Theme Toggle
+themeToggleBtn.addEventListener('click', async () => {
+    const isDark = document.documentElement.classList.contains('dark');
+    const newTheme = isDark ? 'light' : 'dark';
+    setTheme(newTheme);
+    await chrome.storage.local.set({ theme: newTheme });
+});
+
+function setTheme(theme) {
+    if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        themeSun.classList.remove('hidden');
+        themeMoon.classList.add('hidden');
+    } else {
+        document.documentElement.classList.remove('dark');
+        themeSun.classList.add('hidden');
+        themeMoon.classList.remove('hidden');
+    }
+}
 
 // Settings Events
 settingsBtn.addEventListener('click', () => {
