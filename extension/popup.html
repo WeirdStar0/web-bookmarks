@@ -6,33 +6,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Bookmarks</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
-    <div id="app"
-        class="w-80 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 h-[500px] flex flex-col text-sm">
+    <div id="app">
         <!-- Header -->
-        <header
-            class="bg-white dark:bg-gray-800 shadow-sm px-4 py-2 flex justify-between items-center z-10 flex-shrink-0">
-            <h1 class="font-bold text-base text-blue-600 dark:text-blue-400 flex items-center">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        <header>
+            <div class="header-logo">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
                         d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
                 </svg>
-                Web Bookmarks
-            </h1>
-            <div class="flex items-center space-x-2">
-                <button id="settingsBtn" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" title="设置">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                Bookmarks
+            </div>
+            <div class="header-actions">
+                <button id="settingsBtn" class="btn-icon" title="设置">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
                         </path>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     </svg>
                 </button>
-                <button id="logoutBtn" class="text-gray-400 hover:text-red-500 hidden" title="退出">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button id="logoutBtn" class="btn-icon btn-logout hidden" title="退出">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
                         </path>
@@ -42,117 +43,107 @@
         </header>
 
         <!-- Settings View -->
-        <div id="settingsView" class="flex-1 flex flex-col p-4 hidden bg-gray-50 dark:bg-gray-900">
-            <h2 class="text-base font-semibold mb-4">设置</h2>
+        <div id="settingsView" class="view-container hidden">
+            <h2 style="font-size: 18px; margin-bottom: 20px; font-weight: 700;">扩展设置</h2>
             <form id="settingsForm" class="space-y-3">
-                <div>
-                    <label class="block text-xs font-medium text-gray-500 mb-1">服务器地址</label>
-                    <input type="url" id="serverUrl" placeholder="https://your-worker.workers.dev"
-                        class="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:text-white"
-                        required>
-                    <p class="text-xs text-gray-400 mt-1">请输入您的 Cloudflare Worker 地址</p>
+                <div class="form-group">
+                    <label class="label">服务器地址</label>
+                    <input type="url" id="serverUrl" placeholder="https://your-worker.workers.dev" required>
+                    <p style="font-size: 11px; color: var(--text-dim); margin-top: 6px;">请输入您的 Cloudflare Worker 部署地址
+                    </p>
                 </div>
-                <button type="submit"
-                    class="w-full bg-blue-600 text-white py-1.5 rounded hover:bg-blue-700 transition-colors text-sm font-medium">保存</button>
-                <button type="button" id="cancelSettingsBtn"
-                    class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 py-1.5 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium">取消</button>
+                <button type="submit" class="btn-primary">保存配置</button>
+                <button type="button" id="cancelSettingsBtn" class="btn-secondary">取消</button>
             </form>
         </div>
 
         <!-- Login View -->
-        <div id="loginView" class="flex-1 flex flex-col justify-center p-6 hidden">
-            <div class="text-center mb-6">
+        <div id="loginView" class="view-container hidden"
+            style="display: flex; flex-direction: column; justify-content: center; height: 100%;">
+            <div style="text-align: center; margin-bottom: 24px;">
                 <div
-                    class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-3 text-blue-600 dark:text-blue-400">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    style="width: 56px; height: 56px; background: var(--primary-light); border-radius: 16px; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: var(--primary);">
+                    <svg style="width: 28px; height: 28px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                     </svg>
                 </div>
-                <h2 class="text-base font-semibold">登录</h2>
+                <h2 style="font-size: 18px; font-weight: 700;">欢迎回来</h2>
+                <p style="font-size: 13px; color: var(--text-dim); margin-top: 4px;">请登录您的书签账号</p>
             </div>
-            <form id="loginForm" class="space-y-3">
-                <div>
-                    <input type="text" id="username" placeholder="用户名"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:text-white text-sm"
-                        required>
+            <form id="loginForm">
+                <div class="form-group">
+                    <input type="text" id="username" placeholder="用户名" required>
                 </div>
-                <div>
-                    <input type="password" id="password" placeholder="密码"
-                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:text-white text-sm"
-                        required>
+                <div class="form-group">
+                    <input type="password" id="password" placeholder="密码" required>
                 </div>
-                <div id="loginError" class="text-red-500 text-xs text-center hidden"></div>
-                <button type="submit"
-                    class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors text-sm font-medium">登录</button>
+                <div id="loginError" class="status-msg status-error hidden"></div>
+                <button type="submit" class="btn-primary" style="margin-top: 8px;">立即登录</button>
             </form>
         </div>
 
         <!-- Main View -->
         <div id="mainView" class="flex-1 flex flex-col hidden overflow-hidden">
             <!-- Tabs -->
-            <div class="flex border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
-                <button id="tabSave"
-                    class="flex-1 py-2 text-xs font-medium text-blue-600 border-b-2 border-blue-600">保存书签</button>
-                <button id="tabSearch"
-                    class="flex-1 py-2 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">搜索</button>
+            <div class="tabs">
+                <button id="tabSave" class="tab active">保存书签</button>
+                <button id="tabSearch" class="tab">搜索书签</button>
             </div>
 
-            <!-- Save Panel -->
-            <div id="panelSave" class="p-4 flex-1 overflow-y-auto">
-                <form id="saveForm" class="space-y-3">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">标题</label>
-                        <input type="text" id="bookmarkTitle"
-                            class="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:text-white">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">网址</label>
-                        <input type="text" id="bookmarkUrl"
-                            class="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:text-white text-gray-500 bg-gray-50 dark:bg-gray-900"
-                            readonly>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">描述</label>
-                        <textarea id="bookmarkDescription" rows="2"
-                            class="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:text-white resize-none"
-                            placeholder="可选描述..."></textarea>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-500 mb-1">文件夹</label>
-                        <select id="folderSelect"
-                            class="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:text-white">
-                            <option value="">加载中...</option>
-                        </select>
-                    </div>
-                    <div id="saveMessage" class="text-xs text-center hidden"></div>
-                    <button type="submit"
-                        class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors text-sm font-medium flex justify-center items-center mt-4">
-                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7">
-                            </path>
-                        </svg>
-                        保存
-                    </button>
-                </form>
-            </div>
-
-            <!-- Search Panel -->
-            <div id="panelSearch" class="flex-1 flex flex-col hidden h-full">
-                <div class="p-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
-                    <div class="relative">
-                        <input type="text" id="searchInput" placeholder="搜索书签..."
-                            class="w-full pl-8 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:text-white">
-                        <svg class="w-4 h-4 absolute left-2.5 top-2 text-gray-400" fill="none" stroke="currentColor"
-                            viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                        </svg>
-                    </div>
+            <!-- Content Area -->
+            <div class="view-container">
+                <!-- Save Panel -->
+                <div id="panelSave" class="scrollable-content">
+                    <form id="saveForm">
+                        <div class="form-group">
+                            <label class="label">标题</label>
+                            <input type="text" id="bookmarkTitle" placeholder="输入书签标题">
+                        </div>
+                        <div class="form-group">
+                            <label class="label">网址</label>
+                            <input type="text" id="bookmarkUrl" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label class="label">描述</label>
+                            <textarea id="bookmarkDescription" rows="2" placeholder="输入书签描述 (可选)"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label class="label">选择文件夹</label>
+                            <select id="folderSelect">
+                                <option value="">加载中...</option>
+                            </select>
+                        </div>
+                        <div id="saveMessage" class="status-msg hidden"></div>
+                        <button type="submit" class="btn-primary" style="margin-top: 8px;">
+                            <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                    d="M5 13l4 4L19 7">
+                                </path>
+                            </svg>
+                            保存到书签
+                        </button>
+                    </form>
                 </div>
-                <div id="searchResults" class="flex-1 overflow-y-auto p-2 space-y-1">
-                    <!-- Results will be injected here -->
-                    <div class="text-center text-gray-500 text-xs py-8">输入关键词搜索</div>
+
+                <!-- Search Panel -->
+                <div id="panelSearch" class="scrollable-content hidden">
+                    <div class="search-box">
+                        <div class="search-icon">
+                            <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                        <input type="text" id="searchInput" class="search-input" placeholder="输入关键词搜索...">
+                    </div>
+                    <div id="searchResults" style="flex: 1; overflow-y: auto;">
+                        <div style="text-align: center; color: var(--text-dim); padding: 40px 0;">
+                            <p style="font-size: 13px;">开始输入以搜索书签</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
