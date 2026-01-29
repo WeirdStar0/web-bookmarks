@@ -94,7 +94,7 @@ app.use('/api/*', async (c, next) => {
 
 // Middleware: Auth & Init
 app.use('*', async (c, next) => {
-    const config = getConfig(c.env);
+    let envSecret = c.env.SECRET_KEY;
 
     // 1. 自动检测并初始化数据库表结构 (真正的“一键部署”自愈逻辑)
     try {
@@ -147,7 +147,26 @@ app.use('*', async (c, next) => {
         }
     }
 
-    // 2. 初始化默认配置 (如果需要)
+    // 2. 密钥自愈逻辑 (零配置核心)
+    let dynamicSecret = envSecret;
+    try {
+        const dbSecretResult = await c.env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind('secret_key').first();
+        if (dbSecretResult) {
+            // 如果环境变量缺失,优先使用数据库中的密钥
+            if (!dynamicSecret) dynamicSecret = dbSecretResult.value as string;
+        } else if (!dynamicSecret) {
+            // 如果环境变量和数据库都缺失,则生成新密钥
+            console.log('SECRET_KEY not found. Generating a new one...');
+            const newSecret = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+            await c.env.DB.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').bind('secret_key', newSecret).run();
+            dynamicSecret = newSecret;
+        }
+    } catch (e) {
+        // 忽略,由后续逻辑处理
+    }
+
+    // 3. 初始化默认管理员配置
     try {
         const results = await c.env.DB.prepare('SELECT * FROM settings WHERE key = ?').bind('username').first();
         if (!results) {
@@ -158,12 +177,15 @@ app.use('*', async (c, next) => {
         // 忽略,由步骤1处理
     }
 
-    // 3. 字段迁移 (确保旧版本兼容)
+    // 4. 字段迁移 (确保旧版本兼容)
     try {
         await c.env.DB.prepare('ALTER TABLE folders ADD COLUMN sort_order INTEGER DEFAULT 0').run();
     } catch (e) {
         // 忽略,说明列已存在
     }
+
+    // 注入动态密钥
+    const finalSecret = dynamicSecret || 'dev-secret-key-fallback';
 
     // Public routes
     if (c.req.path === '/api/login' || (c.req.path === '/' && !getCookie(c, 'auth'))) {
@@ -171,7 +193,7 @@ app.use('*', async (c, next) => {
     }
 
     // Check Auth - Signed Cookie
-    const cookie = await getSignedCookie(c, config.secretKey, 'auth');
+    const cookie = await getSignedCookie(c, finalSecret, 'auth');
     if (!cookie) {
         if (c.req.path.startsWith('/api/')) {
             return c.json({ error: 'Unauthorized' }, 401);
