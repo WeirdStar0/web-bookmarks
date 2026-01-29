@@ -1,6 +1,8 @@
 # Web Bookmarks Manager
 
-一个基于 Cloudflare Workers 和 D1 数据库构建的现代化书签管理系统。
+ 一个基于 Cloudflare Workers 和 D1 数据库构建的现代化书签管理系统。
+
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks-)
 
 ## ✨ 功能特性
 
@@ -118,35 +120,45 @@ npm run migrate:remote
 npm run deploy
 ```
 
-### 新项目部署
+## 🚀 快速部署
 
-#### 方法一: 使用 Wrangler CLI (推荐)
+### 方法一：一键部署 (推荐)
 
-1. **登录 Cloudflare**
+点击上方的 **Deploy to Cloudflare Workers** 按钮。它会自动：
+1. Fork/Clone 本仓库到你的账号。
+2. 在 Cloudflare 中创建 Worker。
+3. 自动创建并绑定 D1 数据库。
 
-```bash
-npx wrangler login
-```
+**部署后的关键步骤：**
+1. **设置密钥**：在 Cloudflare Dashboard 的 Workers 设置中添加环境变量 `SECRET_KEY`（[如何生成？](#1-生成安全密钥-secret_key)）。
+2. **初始化数据库**：在本地运行 `npm run migrate:remote` 以创建表结构（需要先执行 `npx wrangler login`）。
 
-2. **创建生产环境数据库**
+---
 
-```bash
-# 创建 D1 数据库
-npx wrangler d1 create bookmarks-db
+### 方法二：使用命令行部署 (适合开发)
 
-# 记录输出的 database_id,更新 wrangler.toml
-```
+1. **克隆并安装**
+   ```bash
+   git clone https://github.com/WeirdStar0/web-bookmarks-.git
+   cd web-bookmarks-
+   npm install
+   ```
 
-3. **更新 wrangler.toml**
+2. **初始化数据库**
+   ```bash
+   npx wrangler login
+   npx wrangler d1 create bookmarks-db
+   # 将输出的 database_id 填入 wrangler.toml
+   npm run migrate:remote
+   ```
 
-编辑 `wrangler.toml`,将 `database_id` 替换为实际的数据库 ID:
+3. **设置密钥并部署**
+   ```bash
+   npx wrangler secret put SECRET_KEY
+   npm run deploy
+   ```
 
-```toml
-[[d1_databases]]
-binding = "DB"
-database_name = "bookmarks-db"
-database_id = "your-actual-database-id"  # 替换这里
-```
+## 🛠️ 本地开发
 
 4. **设置 SECRET_KEY**
 
