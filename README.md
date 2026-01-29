@@ -14,9 +14,8 @@
 - ⚡ **无服务器架构** - 部署在 Cloudflare Workers，全球边缘网络加速
 - 💾 **D1 数据库** - 使用 Cloudflare D1 SQLite 数据库存储数据
 - 🚀 **性能卓越** - 侧边栏预计算书签数量，极速响应，即使书签再多也不卡顿
-- 🎨 **暗黑模式** - 完美支持暗黑模式，保护视力
 
-**新增功能**: 拖拽排序! 查看 [DRAG_DROP_GUIDE.md](./DRAG_DROP_GUIDE.md) 了解详情
+- 🎨 **暗黑模式** - 完美支持暗黑模式，保护视力
 
 ## 🚀 技术栈
 
@@ -33,15 +32,11 @@
 - Cloudflare 账号
 - Wrangler CLI (Cloudflare 开发工具)
 
-## 📢 重要提示
+### 🔐 安全与升级
 
-### 🔐 安全升级
-
-如果你正在从旧版本升级,请查看 [UPGRADE.md](./UPGRADE.md) 了解最新的安全改进和部署步骤。
-
-**主要改进:**
-- ✅ 环境变量配置(不再硬编码密钥)
-- ✅ 请求速率限制(防止 DDoS 攻击)
+本版本引入了多项安全改进：
+- ✅ 环境变量配置 (不再硬编码密钥)
+- ✅ 请求速率限制 (防止 DDoS 攻击)
 - ✅ 输入验证和 SQL 注入防护
 - ✅ 数据库索引优化
 
@@ -108,13 +103,9 @@ npm run dev
 - 用户名: `admin`
 - 密码: `12345`
 
-## 📦 部署到 Cloudflare Workers
+### 🆕 更新现有项目
 
-### 🆕 已有项目更新?
-
-如果你已经在 Cloudflare Workers 上部署了此项目,请查看 **[DEPLOYMENT.md](./DEPLOYMENT.md)** 了解详细的更新步骤。
-
-**快速更新命令:**
+如果你已经部署过，可以使用以下快速命令更新：
 ```bash
 # 1. 设置 SECRET_KEY (首次部署必需)
 npx wrangler secret put SECRET_KEY
@@ -207,9 +198,34 @@ npm run deploy
 - `CLOUDFLARE_API_TOKEN`: Cloudflare API Token ([详情](https://dash.cloudflare.com/profile/api-tokens))
 - `CLOUDFLARE_ACCOUNT_ID`: Cloudflare Account ID (在 Workers 概览页右侧查看)
 
-2. **创建 GitHub Actions 工作流**
+2. **自动化部署**
 
-项目已包含 `.github/workflows/deploy.yml`,每次推送到 `main` 分支时自动部署。
+项目已包含 `.github/workflows/deploy.yml`，只要你在 GitHub 仓库中配置好上述 Secret，每次推送到 `main` 分支时都会自动部署。
+
+## 💡 技巧与常见问题
+
+### 1. 生成安全密钥 (SECRET_KEY)
+
+```bash
+# 使用 OpenSSL
+openssl rand -base64 32
+
+# 或使用 Node.js
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+### 2. 登录后立即退出？
+- 确保生产环境的 `SECRET_KEY` 已通过 `npx wrangler secret put SECRET_KEY` 设置，且与本地一致。
+- 如果更换了密钥，请清除浏览器 Cookie 后重新登录。
+
+### 3. 如何重置密码？
+```bash
+npx wrangler d1 execute bookmarks-db --remote --command="UPDATE settings SET value='newpassword' WHERE key='password'"
+```
+
+### 4. 速率限制不生效？
+- 确保已创建 KV 命名空间：`npx wrangler kv:namespace create RATE_LIMIT_KV`
+- 确保 `wrangler.toml` 中已正确绑定该 KV。
 
 ## 🔧 配置说明
 
@@ -315,34 +331,6 @@ SECRET_KEY=your-secret-key
 
 ISC License
 
-## 🙋 常见问题
-
-### 如何重置密码?
-
-如果忘记密码,可以通过 Wrangler CLI 直接修改数据库:
-
-```bash
-npx wrangler d1 execute bookmarks-db --remote --command="UPDATE settings SET value='newpassword' WHERE key='password'"
-```
-
-### 如何备份数据?
-
-1. 使用应用内的导出功能导出 HTML 格式书签
-2. 或使用 Wrangler 导出整个数据库:
-
-```bash
-npx wrangler d1 export bookmarks-db --remote --output=backup.sql
-```
-
-### 如何查看数据库内容?
-
-```bash
-# 查看所有书签
-npx wrangler d1 execute bookmarks-db --remote --command="SELECT * FROM bookmarks"
-
-# 查看所有文件夹
-npx wrangler d1 execute bookmarks-db --remote --command="SELECT * FROM folders"
-```
 
 ## 📞 支持
 
