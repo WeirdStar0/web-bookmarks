@@ -43,8 +43,8 @@ app.use('/api/*', async (c, next) => {
     }
 
     const ip = c.req.header('cf-connecting-ip') ||
-               c.req.header('x-forwarded-for')?.split(',')[0] ||
-               'unknown';
+        c.req.header('x-forwarded-for')?.split(',')[0] ||
+        'unknown';
 
     const key = `ratelimit:${ip}`;
     const now = Date.now();
@@ -369,41 +369,41 @@ app.put('/api/bookmarks/reorder', async (c) => {
     try {
         const { orderedIds } = await c.req.json();
 
-    if (!Array.isArray(orderedIds)) {
-        return c.json({ error: 'Invalid input: orderedIds must be an array' }, 400);
-    }
-
-    if (orderedIds.length === 0) {
-        return c.json({ error: 'Invalid input: orderedIds is empty' }, 400);
-    }
-
-    // 验证所有 ID
-    for (let i = 0; i < orderedIds.length; i++) {
-        const id = orderedIds[i];
-        const idValidation = v.validateId(id);
-        if (!idValidation.valid) {
-            return c.json({ error: idValidation.error }, 400);
+        if (!Array.isArray(orderedIds)) {
+            return c.json({ error: 'Invalid input: orderedIds must be an array' }, 400);
         }
-    }
 
-    // 获取当前时间作为基准
-    const now = Date.now();
+        if (orderedIds.length === 0) {
+            return c.json({ error: 'Invalid input: orderedIds is empty' }, 400);
+        }
 
-    // 批量更新时间戳以实现排序
-    const batch = orderedIds.map((id: number, index: number) => {
-        // 每个书签的时间戳间隔 1 秒,保持顺序
-        const timestamp = new Date(now - (orderedIds.length - index) * 1000).toISOString();
-        return c.env.DB.prepare('UPDATE bookmarks SET created_at = ? WHERE id = ?')
-            .bind(timestamp, id);
-    });
+        // 验证所有 ID
+        for (let i = 0; i < orderedIds.length; i++) {
+            const id = orderedIds[i];
+            const idValidation = v.validateId(id);
+            if (!idValidation.valid) {
+                return c.json({ error: idValidation.error }, 400);
+            }
+        }
 
-    try {
-        await c.env.DB.batch(batch);
-        return c.json({ success: true });
-    } catch (error) {
-        return c.json({ error: 'Database error: ' + error.message }, 500);
-    }
-    } catch (error) {
+        // 获取当前时间作为基准
+        const now = Date.now();
+
+        // 批量更新时间戳以实现排序
+        const batch = orderedIds.map((id: number, index: number) => {
+            // 每个书签的时间戳间隔 1 秒,保持顺序
+            const timestamp = new Date(now - (orderedIds.length - index) * 1000).toISOString();
+            return c.env.DB.prepare('UPDATE bookmarks SET created_at = ? WHERE id = ?')
+                .bind(timestamp, id);
+        });
+
+        try {
+            await c.env.DB.batch(batch);
+            return c.json({ success: true });
+        } catch (error: any) {
+            return c.json({ error: 'Database error: ' + error.message }, 500);
+        }
+    } catch (error: any) {
         return c.json({ error: 'Request processing error: ' + error.message }, 400);
     }
 });

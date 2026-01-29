@@ -16,6 +16,7 @@ export const scripts = `
                 trashFolders: [],
                 trashBookmarks: [],
                 expandedFolders: {}, // For sidebar tree
+                folderCounts: {}, // Pre-calculated bookmark counts by folder ID
 
                 isLoading: false,
                 loadingText: '',
@@ -48,6 +49,7 @@ export const scripts = `
                 // 拖拽状态
                 draggedItem: null, // { id, type, data }
                 dropTarget: null, // { id, type }
+                isSorting: false,
 
                 init() {
                     if (this.darkMode) document.documentElement.classList.add('dark');
@@ -71,10 +73,13 @@ export const scripts = `
                 async withLoading(fn) {
                     if (this.isOperationPending) return;
                     this.isOperationPending = true;
+                    this.isLoading = true;
+                    this.loadingText = '处理中...';
                     try {
                         await fn();
                     } finally {
                         this.isOperationPending = false;
+                        this.isLoading = false;
                     }
                 },
 
@@ -118,6 +123,16 @@ export const scripts = `
                     const data = await res.json();
                     this.folders = data.folders;
                     this.bookmarks = data.bookmarks;
+                    this.calculateFolderCounts();
+                },
+
+                calculateFolderCounts() {
+                    this.folderCounts = {};
+                    this.bookmarks.forEach(b => {
+                        if (!b.is_deleted && b.folder_id) {
+                            this.folderCounts[b.folder_id] = (this.folderCounts[b.folder_id] || 0) + 1;
+                        }
+                    });
                 },
 
                 async loadTrash() {
@@ -174,7 +189,7 @@ export const scripts = `
                 },
 
                 getFolderBookmarkCount(folderId) {
-                    return this.bookmarks.filter(b => b.folder_id === folderId).length;
+                    return this.folderCounts[folderId] || 0;
                 },
 
                 get flattenedFolders() {
@@ -459,6 +474,10 @@ export const scripts = `
                     } else {
                         document.documentElement.classList.remove('dark');
                     }
+                },
+
+                toggleSorting() {
+                    this.isSorting = !this.isSorting;
                 },
                 
                 showToast(message, type = 'success') {

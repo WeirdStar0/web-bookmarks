@@ -42,7 +42,7 @@ export const main = `
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                                 </div>
-                                <input type="text" x-model="searchQuery" class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:bg-white dark:focus:bg-gray-600 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors" placeholder="搜索书签或文件夹...">
+                                <input type="text" x-model.debounce.300ms="searchQuery" class="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:bg-white dark:focus:bg-gray-600 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors" placeholder="搜索书签或文件夹...">
                             </div>
                         </div>
                     </div>
@@ -136,13 +136,28 @@ export const main = `
 
                 <!-- Action Buttons (Home View) -->
                 <div x-show="currentView === 'home' && !searchQuery" class="flex space-x-3 mb-6">
-                    <button @click="openFolderModal()" :disabled="isOperationPending" :class="{'opacity-50 cursor-not-allowed': isOperationPending}" class="flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium shadow-sm">
+                    <button @click="openFolderModal()" :disabled="isOperationPending || isSorting" :class="{'opacity-50 cursor-not-allowed': isOperationPending || isSorting}" class="flex items-center px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors text-sm font-medium shadow-sm">
                         <svg class="w-5 h-5 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
                         新建文件夹
                     </button>
-                    <button @click="openBookmarkModal()" :disabled="isOperationPending" :class="{'opacity-50 cursor-not-allowed': isOperationPending}" class="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-sm font-medium">
+                    <button @click="openBookmarkModal()" :disabled="isOperationPending || isSorting" :class="{'opacity-50 cursor-not-allowed': isOperationPending || isSorting}" class="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm text-sm font-medium">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                         新建书签
+                    </button>
+                    <button @click="toggleSorting()" class="flex items-center px-4 py-2 rounded-lg transition-colors shadow-sm text-sm font-medium"
+                            :class="isSorting ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200'">
+                        <template x-if="!isSorting">
+                            <div class="flex items-center">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"></path></svg>
+                                排序
+                            </div>
+                        </template>
+                        <template x-if="isSorting">
+                            <div class="flex items-center">
+                                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                                完成
+                            </div>
+                        </template>
                     </button>
                 </div>
 
@@ -158,15 +173,16 @@ export const main = `
                              @dragover.prevent="handleDragOver($event, 'folder')"
                              @drop="handleDrop($event, 'folder')">
                             <template x-for="folder in currentFolders" :key="folder.id">
-                                <div class="group relative bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm hover:shadow-md border-2 border-gray-100 dark:border-gray-700 transition-all duration-200 cursor-move folder-item"
-                                     :draggable="currentView === 'home' && !searchQuery"
+                                <div class="group relative bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm hover:shadow-md border-2 border-gray-100 dark:border-gray-700 transition-all duration-200 folder-item"
+                                     :draggable="isSorting && currentView === 'home' && !searchQuery"
                                      @dragstart="handleDragStart($event, folder, 'folder')"
                                      @dragend="handleDragEnd($event)"
-                                     @click="currentView === 'home' ? currentFolderId = folder.id : null"
+                                     @click="!isSorting && currentView === 'home' ? currentFolderId = folder.id : null"
                                      :class="{
                                         'opacity-40 scale-95 shadow-lg': draggedItem?.type === 'folder' && draggedItem?.id === folder.id,
                                         'border-blue-500 shadow-lg shadow-blue-500/20 bg-blue-50 dark:bg-blue-900/20': dropTarget?.type === 'folder' && dropTarget?.id === folder.id,
-                                        'cursor-grab active:cursor-grabbing': currentView === 'home' && !searchQuery
+                                        'cursor-grab active:cursor-grabbing': isSorting && currentView === 'home' && !searchQuery,
+                                        'cursor-pointer': !isSorting && currentView === 'home'
                                      }">
                                     <div class="flex flex-col items-center text-center">
                                         <div class="w-12 h-12 mb-3 text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform pointer-events-none">
@@ -177,7 +193,7 @@ export const main = `
                                     </div>
 
                                     <!-- Home View Actions -->
-                                    <div x-show="currentView === 'home'" class="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-all">
+                                    <div x-show="currentView === 'home' && !isSorting" class="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-all">
                                         <button @click.stop="openFolderModal(folder)" class="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full" title="重命名">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                         </button>
@@ -210,16 +226,16 @@ export const main = `
                              @dragover.prevent="handleDragOver($event, 'bookmark')"
                              @drop="handleDrop($event, 'bookmark')">
                             <template x-for="bookmark in currentBookmarks" :key="bookmark.id">
-                                <div class="group relative bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm hover:shadow-md border-2 border-gray-100 dark:border-gray-700 transition-all duration-200 cursor-move bookmark-item"
-                                     :draggable="currentView === 'home' && !searchQuery"
+                                <div class="group relative bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm hover:shadow-md border-2 border-gray-100 dark:border-gray-700 transition-all duration-200 bookmark-item"
+                                     :draggable="isSorting && currentView === 'home' && !searchQuery"
                                      @dragstart="handleDragStart($event, bookmark, 'bookmark')"
                                      @dragend="handleDragEnd($event)"
                                      :class="{
                                         'opacity-40 scale-95 shadow-lg': draggedItem?.type === 'bookmark' && draggedItem?.id === bookmark.id,
                                         'border-blue-500 shadow-lg shadow-blue-500/20 bg-blue-50 dark:bg-blue-900/20': dropTarget?.type === 'bookmark' && dropTarget?.id === bookmark.id,
-                                        'cursor-grab active:cursor-grabbing': currentView === 'home' && !searchQuery
+                                        'cursor-grab active:cursor-grabbing': isSorting && currentView === 'home' && !searchQuery
                                      }">
-                                    <a :href="currentView === 'home' ? bookmark.url : '#'" :target="currentView === 'home' ? '_blank' : ''" class="flex items-start space-x-3">
+                                    <a :href="currentView === 'home' && !isSorting ? bookmark.url : '#'" :target="currentView === 'home' && !isSorting ? '_blank' : ''" class="flex items-start space-x-3" :class="isSorting ? 'cursor-default' : ''">
                                         <div class="flex-shrink-0 w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 font-bold text-lg uppercase pointer-events-none">
                                             <img :src="'https://www.google.com/s2/favicons?sz=64&domain=' + bookmark.url" class="w-6 h-6" @error="$el.style.display='none'" />
                                             <span x-show="!$el.previousElementSibling || $el.previousElementSibling.style.display === 'none'" x-text="bookmark.title.charAt(0)"></span>
@@ -231,7 +247,7 @@ export const main = `
                                     </a>
 
                                     <!-- Home View Actions -->
-                                    <div x-show="currentView === 'home'" class="absolute top-3 right-3 flex space-x-1 opacity-0 group-hover:opacity-100 transition-all">
+                                    <div x-show="currentView === 'home' && !isSorting" class="absolute top-3 right-3 flex space-x-1 opacity-0 group-hover:opacity-100 transition-all">
                                         <button @click.prevent="openBookmarkModal(bookmark)" class="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full" title="编辑">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                         </button>
@@ -264,10 +280,10 @@ export const main = `
                         <h3 class="text-xl font-medium text-gray-900 dark:text-gray-200 mb-2" x-text="currentView === 'trash' ? '回收站为空' : (searchQuery ? '未找到相关内容' : '这里空空如也')"></h3>
                         <p class="text-gray-500 dark:text-gray-400 max-w-sm mx-auto mb-8" x-text="currentView === 'trash' ? '删除的项目会显示在这里' : (searchQuery ? '尝试更换关键词搜索' : '当前文件夹下还没有任何内容。您可以创建新的文件夹或添加书签。')"></p>
                         <div class="flex space-x-4" x-show="currentView === 'home' && !searchQuery">
-                            <button @click="openFolderModal()" :disabled="isOperationPending" :class="{'opacity-50 cursor-not-allowed': isOperationPending}" class="px-6 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors">
+                            <button @click="openFolderModal()" :disabled="isOperationPending || isSorting" :class="{'opacity-50 cursor-not-allowed': isOperationPending || isSorting}" class="px-6 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors">
                                 新建文件夹
                             </button>
-                            <button @click="openBookmarkModal()" :disabled="isOperationPending" :class="{'opacity-50 cursor-not-allowed': isOperationPending}" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-lg transition-colors">
+                            <button @click="openBookmarkModal()" :disabled="isOperationPending || isSorting" :class="{'opacity-50 cursor-not-allowed': isOperationPending || isSorting}" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-lg transition-colors">
                                 添加书签
                             </button>
                         </div>

@@ -67,7 +67,6 @@ export const modals = `
             </div>
                 <button @click="showFolderModal = false" class="px-5 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg font-medium transition-colors">取消</button>
                 <button @click="createFolder()" :disabled="isOperationPending" :class="{'opacity-50 cursor-not-allowed': isOperationPending}" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-md transition-colors" x-text="editMode ? '保存' : '创建'"></button>
-            </div>
         </div>
     </div>
 
