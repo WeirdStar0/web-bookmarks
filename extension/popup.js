@@ -30,8 +30,13 @@ const searchResults = document.getElementById('searchResults');
 
 // Initialization
 document.addEventListener('DOMContentLoaded', async () => {
+    // Apply Dark Mode automatically based on system preference
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+    }
+
     // Load config
-    const config = await chrome.storage.local.get(['apiBase', 'token']);
+    const config = await chrome.storage.local.get(['apiBase', 'token', 'lastFolderId']);
 
     if (config.apiBase) {
         API_BASE = config.apiBase;
@@ -39,7 +44,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         if (config.token) {
             token = config.token;
-            showMainView();
+            showMainView(config.lastFolderId);
         } else {
             showLoginView();
         }
@@ -66,7 +71,6 @@ cancelSettingsBtn.addEventListener('click', () => {
         if (token) showMainView();
         else showLoginView();
     } else {
-        // If no API base set, cannot cancel
         serverUrlInput.focus();
     }
 });
@@ -74,18 +78,13 @@ cancelSettingsBtn.addEventListener('click', () => {
 settingsForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     let url = serverUrlInput.value.trim();
-    // Remove trailing slash
     if (url.endsWith('/')) url = url.slice(0, -1);
-
     if (!url) return;
 
     API_BASE = url;
     await chrome.storage.local.set({ apiBase: url });
-
-    // Reset auth on server change to be safe
     token = null;
     await chrome.storage.local.remove(['token']);
-
     showLoginView();
 });
 
@@ -99,7 +98,8 @@ loginForm.addEventListener('submit', async (e) => {
         const res = await fetch(`${API_BASE}/api/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
+            body: JSON.stringify({ username, password }),
+            credentials: 'include'
         });
 
         if (res.ok) {
@@ -109,10 +109,10 @@ loginForm.addEventListener('submit', async (e) => {
                 token = 'logged_in';
                 showMainView();
             } else {
-                showLoginError('登录失败');
+                showLoginError('登录失败: ' + (data.error || '未知错误'));
             }
         } else {
-            showLoginError('登录失败');
+            showLoginError('登录失败 (状态码: ' + res.status + ')');
         }
     } catch (err) {
         showLoginError('连接失败，请检查服务器地址');
@@ -120,6 +120,9 @@ loginForm.addEventListener('submit', async (e) => {
 });
 
 logoutBtn.addEventListener('click', async () => {
+    try {
+        await fetch(`${API_BASE}/api/logout`, { method: 'POST', credentials: 'include' });
+    } catch (e) { }
     await chrome.storage.local.remove(['token']);
     token = null;
     showLoginView();
@@ -134,6 +137,7 @@ saveForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const title = document.getElementById('bookmarkTitle').value;
     const url = document.getElementById('bookmarkUrl').value;
+    const description = document.getElementById('bookmarkDescription').value;
     const folderId = document.getElementById('folderSelect').value;
 
     if (!folderId) {
@@ -145,14 +149,17 @@ saveForm.addEventListener('submit', async (e) => {
         const res = await fetch(`${API_BASE}/api/bookmarks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, url, folder_id: parseInt(folderId) })
+            body: JSON.stringify({ title, url, description, folder_id: parseInt(folderId) }),
+            credentials: 'include'
         });
 
         if (res.ok) {
+            await chrome.storage.local.set({ lastFolderId: folderId });
             showSaveMessage('保存成功', 'success');
             setTimeout(() => window.close(), 1000);
         } else {
-            showSaveMessage('保存失败', 'error');
+            const data = await res.json();
+            showSaveMessage('保存失败: ' + (data.error || '未知错误'), 'error');
         }
     } catch (err) {
         showSaveMessage('网络错误', 'error');
@@ -168,7 +175,7 @@ searchInput.addEventListener('input', debounce(async (e) => {
     }
 
     try {
-        const res = await fetch(`${API_BASE}/api/data`);
+        const res = await fetch(`${API_BASE}/api/data`, { credentials: 'include' });
         if (res.ok) {
             const data = await res.json();
             const bookmarks = data.bookmarks.filter(b =>
@@ -200,13 +207,13 @@ function showLoginView() {
     loginError.classList.add('hidden');
 }
 
-async function showMainView() {
+async function showMainView(lastFolderId) {
     settingsView.classList.add('hidden');
     loginView.classList.add('hidden');
     mainView.classList.remove('hidden');
     settingsBtn.classList.remove('hidden');
     logoutBtn.classList.remove('hidden');
-    await loadFolders();
+    await loadFolders(lastFolderId);
 }
 
 function showLoginError(msg) {
@@ -233,13 +240,13 @@ function switchTab(tab) {
     }
 }
 
-async function loadFolders() {
+async function loadFolders(lastFolderId) {
     try {
-        const res = await fetch(`${API_BASE}/api/data`);
+        const res = await fetch(`${API_BASE}/api/data`, { credentials: 'include' });
         if (res.ok) {
             const data = await res.json();
             folders = data.folders;
-            renderFolderSelect();
+            renderFolderSelect(lastFolderId);
         } else if (res.status === 401) {
             await chrome.storage.local.remove(['token']);
             showLoginView();
@@ -249,7 +256,7 @@ async function loadFolders() {
     }
 }
 
-function renderFolderSelect() {
+function renderFolderSelect(lastFolderId) {
     folderSelect.innerHTML = '<option value="">选择文件夹...</option>';
     const buildOptions = (parentId, level = 0) => {
         const children = folders.filter(f => f.parent_id === parentId)
@@ -258,6 +265,9 @@ function renderFolderSelect() {
             const option = document.createElement('option');
             option.value = folder.id;
             option.textContent = '　'.repeat(level) + folder.name;
+            if (lastFolderId && folder.id.toString() === lastFolderId.toString()) {
+                option.selected = true;
+            }
             folderSelect.appendChild(option);
             buildOptions(folder.id, level + 1);
         });
@@ -274,12 +284,16 @@ function renderSearchResults(bookmarks) {
     bookmarks.forEach(bookmark => {
         const div = document.createElement('div');
         div.className = 'p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer flex items-center space-x-2.5 transition-colors';
+
+        // Use Google Favicon Service
+        const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}&sz=32`;
+
         div.innerHTML = `
-            <div class="flex-shrink-0 w-6 h-6 bg-gray-200 dark:bg-gray-600 rounded flex items-center justify-center text-[10px] font-bold text-gray-500 dark:text-gray-300 uppercase">
-                ${bookmark.title.charAt(0)}
+            <div class="flex-shrink-0 w-6 h-6 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center overflow-hidden">
+                <img src="${faviconUrl}" class="w-4 h-4" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><path d=%22M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z%22></path></svg>'">
             </div>
             <div class="flex-1 min-w-0">
-                <div class="text-sm text-gray-900 dark:text-gray-200 truncate">${bookmark.title}</div>
+                <div class="text-sm text-gray-900 dark:text-gray-200 truncate font-medium">${bookmark.title}</div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 truncate">${bookmark.url}</div>
             </div>
         `;
@@ -292,7 +306,7 @@ function renderSearchResults(bookmarks) {
 
 function showSaveMessage(msg, type) {
     saveMessage.textContent = msg;
-    saveMessage.className = `text-xs text-center ${type === 'success' ? 'text-green-500' : 'text-red-500'}`;
+    saveMessage.className = `p-2 my-2 rounded text-xs text-center ${type === 'success' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`;
     saveMessage.classList.remove('hidden');
     setTimeout(() => saveMessage.classList.add('hidden'), 3000);
 }
