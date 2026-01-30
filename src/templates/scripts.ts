@@ -24,6 +24,7 @@ export const scripts = (t: any) => `
                 isLoading: false,
                 loadingText: '',
                 isOperationPending: false,
+                mobileMenuOpen: false,
                 toast: { show: false, message: '', type: 'success' },
                 
                 editMode: false,
@@ -285,6 +286,7 @@ export const scripts = (t: any) => `
                     } else if (action === 'select') {
                         this.currentFolderId = id;
                         this.currentView = 'home';
+                        this.mobileMenuOpen = false;
                     }
                 },
 

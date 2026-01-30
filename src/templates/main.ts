@@ -30,6 +30,10 @@ export const main = (t: any) => `
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
                     <div class="flex items-center flex-1">
+                        <!-- Mobile Menu Button -->
+                        <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-2 -ml-2 mr-2 text-gray-500 hover:text-blue-600 transition-colors" title="Toggle Menu">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7"></path></svg>
+                        </button>
                         <!-- Logo -->
                         <div class="flex-shrink-0 flex items-center text-blue-600 dark:text-blue-400 font-bold text-xl mr-8">
                             <svg class="w-8 h-8 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
@@ -96,16 +100,28 @@ export const main = (t: any) => `
             </div>
         </nav>
 
-        <div class="flex flex-1 overflow-hidden">
+        <div class="flex flex-1 overflow-hidden relative">
+            <!-- Mobile Sidebar Backdrop -->
+            <div x-show="mobileMenuOpen" 
+                 @click="mobileMenuOpen = false" 
+                 class="fixed inset-0 bg-black/50 z-40 md:hidden"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="transition ease-in duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"></div>
+
             <!-- Sidebar -->
-            <aside class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 hidden md:flex md:flex-col overflow-hidden">
+            <aside :class="mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'" 
+                   class="fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 z-50 md:relative md:translate-x-0 transition-transform duration-300 md:flex md:flex-col overflow-hidden">
                 <div class="p-4 space-y-1 flex-shrink-0">
-                    <button @click="currentFolderId = null; currentView = 'home'; searchQuery = ''" :class="{'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400': currentFolderId === null && currentView === 'home', 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700': !(currentFolderId === null && currentView === 'home')}" class="w-full flex items-center px-3 py-2 rounded-lg transition-colors font-medium">
+                    <button @click="currentFolderId = null; currentView = 'home'; searchQuery = ''; mobileMenuOpen = false" :class="{'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400': currentFolderId === null && currentView === 'home', 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700': !(currentFolderId === null && currentView === 'home')}" class="w-full flex items-center px-3 py-2 rounded-lg transition-colors font-medium">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                         ${t.dashboard.allBookmarks}
                     </button>
                     
-                    <button @click="currentView = 'trash'; loadTrash()" :class="{'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400': currentView === 'trash', 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700': currentView !== 'trash'}" class="w-full flex items-center px-3 py-2 rounded-lg transition-colors font-medium">
+                    <button @click="currentView = 'trash'; loadTrash(); mobileMenuOpen = false" :class="{'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400': currentView === 'trash', 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700': currentView !== 'trash'}" class="w-full flex items-center px-3 py-2 rounded-lg transition-colors font-medium">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                         ${t.dashboard.trash}
                     </button>
