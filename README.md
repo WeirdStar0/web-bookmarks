@@ -1,5 +1,7 @@
 # Web Bookmarks Manager
 
+简体中文 | [English](README.en.md)
+
  一个基于 Cloudflare Workers 和 D1 数据库构建的现代化书签管理系统。
 
 <p align="center">
