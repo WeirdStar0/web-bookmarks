@@ -40,3 +40,6 @@ build/
 .cache/
 tmp/
 temp/
+
+# AI Assistant
+.agent/

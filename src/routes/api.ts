@@ -3,31 +3,24 @@ import { setSignedCookie, deleteCookie, getSignedCookie } from 'hono/cookie';
 import { Bindings, Variables } from '../types';
 import { getConfig, getSettings, hashPassword, hashPasswordV2, invalidateSettingsCache } from '../utils/common';
 import * as v from '../utils/validators';
+import * as s from '../utils/schemas';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 // API: Login
 app.post('/login', async (c) => {
     const config = getConfig(c.env);
-    const { username, password } = await c.req.json();
+    const body = await c.req.json();
+    const result = s.loginSchema.safeParse(body);
 
-    // 输入验证
-    const usernameValidation = v.validateUsername(username);
-    if (!usernameValidation.valid) {
-        return c.json({ error: usernameValidation.error }, 400);
+    if (!result.success) {
+        return c.json({ error: result.error.issues[0].message }, 400);
     }
-
-    const passwordValidation = v.validatePassword(password);
-    if (!passwordValidation.valid) {
-        return c.json({ error: passwordValidation.error }, 400);
-    }
+    const { username, password } = result.data;
 
     const settings = await getSettings(c.env.DB);
     const dbUser = settings.username;
     const dbPass = settings.password;
-
-    const inputHash = await hashPassword(password);
-    const secret = c.get('sessionSecret');
 
     if (username === dbUser) {
         // 1. Check V2 (PBKDF2) - Format: v2:salt:hash
@@ -38,10 +31,14 @@ app.post('/login', async (c) => {
                 const storedHash = parts[2];
                 const result = await hashPasswordV2(password, salt);
                 if (result.hash === storedHash) {
+                    const secret = c.get('sessionSecret');
+                    const url = new URL(c.req.url);
+                    const isSecure = url.protocol === 'https:';
                     await setSignedCookie(c, 'auth', 'true', secret, {
+                        path: '/',
                         httpOnly: true,
-                        secure: true,
-                        sameSite: 'None',
+                        secure: isSecure,
+                        sameSite: isSecure ? 'None' : 'Lax',
                         maxAge: config.sessionMaxAge
                     });
                     return c.json({ success: true });
@@ -57,10 +54,14 @@ app.post('/login', async (c) => {
                 await c.env.DB.prepare('UPDATE settings SET value = ? WHERE key = ?').bind(newDbValue, 'password').run();
                 invalidateSettingsCache();
 
+                const secret = c.get('sessionSecret');
+                const url = new URL(c.req.url);
+                const isSecure = url.protocol === 'https:';
                 await setSignedCookie(c, 'auth', 'true', secret, {
+                    path: '/',
                     httpOnly: true,
-                    secure: true,
-                    sameSite: 'None',
+                    secure: isSecure,
+                    sameSite: isSecure ? 'None' : 'Lax',
                     maxAge: config.sessionMaxAge
                 });
                 return c.json({ success: true, migrated: true });
@@ -78,21 +79,19 @@ app.post('/logout', async (c) => {
 
 // API: Update Settings
 app.put('/settings', async (c) => {
-    const { username, password } = await c.req.json();
+    const body = await c.req.json();
+    const result = s.settingsSchema.safeParse(body);
+
+    if (!result.success) {
+        return c.json({ error: result.error.issues[0].message }, 400);
+    }
+    const { username, password } = result.data;
 
     if (username) {
-        const validation = v.validateUsername(username);
-        if (!validation.valid) {
-            return c.json({ error: validation.error }, 400);
-        }
         await c.env.DB.prepare('UPDATE settings SET value = ? WHERE key = ?').bind(username, 'username').run();
     }
 
     if (password) {
-        const validation = v.validatePassword(password);
-        if (!validation.valid) {
-            return c.json({ error: validation.error }, 400);
-        }
         const v2 = await hashPasswordV2(password);
         const newDbValue = `v2:${v2.salt}:${v2.hash}`;
         await c.env.DB.prepare('UPDATE settings SET value = ? WHERE key = ?').bind(newDbValue, 'password').run();
@@ -104,25 +103,20 @@ app.put('/settings', async (c) => {
 
 // API: Get all data (Protected)
 app.get('/data', async (c) => {
-    const secret = c.get('sessionSecret');
-    if (!await getSignedCookie(c, secret, 'auth')) return c.json({ error: 'Unauthorized' }, 401);
     const { results: folders } = await c.env.DB.prepare('SELECT * FROM folders WHERE is_deleted = 0 ORDER BY sort_order ASC, name ASC').all();
-    const { results: bookmarks } = await c.env.DB.prepare('SELECT * FROM bookmarks WHERE is_deleted = 0 ORDER BY created_at ASC').all();
+    const { results: bookmarks } = await c.env.DB.prepare('SELECT * FROM bookmarks WHERE is_deleted = 0 ORDER BY sort_order ASC, created_at ASC').all();
     return c.json({ folders, bookmarks });
 });
 
 // API: Search Bookmarks (Server-Side)
 app.get('/search', async (c) => {
-    const secret = c.get('sessionSecret');
-    if (!await getSignedCookie(c, secret, 'auth')) return c.json({ error: 'Unauthorized' }, 401);
-
     const query = c.req.query('q');
     if (!query || query.trim().length === 0) {
         return c.json({ bookmarks: [] });
     }
 
     const { results: bookmarks } = await c.env.DB.prepare(
-        'SELECT * FROM bookmarks WHERE is_deleted = 0 AND (title LIKE ? OR url LIKE ?) ORDER BY created_at DESC LIMIT 50'
+        'SELECT * FROM bookmarks WHERE is_deleted = 0 AND (title LIKE ? OR url LIKE ?) ORDER BY sort_order ASC, created_at DESC LIMIT 50'
     ).bind(`%${query}%`, `%${query}%`).all();
 
     return c.json({ bookmarks });
@@ -130,24 +124,25 @@ app.get('/search', async (c) => {
 
 // API: Create Folder
 app.post('/folders', async (c) => {
-    const { name, parent_id } = await c.req.json();
-    const nameValidation = v.validateFolderName(name);
-    if (!nameValidation.valid) {
-        return c.json({ error: nameValidation.error }, 400);
+    const body = await c.req.json();
+    const result = s.folderSchema.safeParse(body);
+
+    if (!result.success) {
+        return c.json({ error: result.error.issues[0].message }, 400);
     }
-    let parentId = null;
-    if (parent_id !== null && parent_id !== undefined) {
-        const idValidation = v.validateId(parent_id);
-        if (!idValidation.valid) return c.json({ error: idValidation.error }, 400);
-        parentId = idValidation.parsed;
-    }
-    await c.env.DB.prepare('INSERT INTO folders (name, parent_id) VALUES (?, ?)').bind(nameValidation.valid ? v.sanitizeString(name, 255) : name, parentId).run();
+    const { name, parent_id } = result.data;
+
+    await c.env.DB.prepare('INSERT INTO folders (name, parent_id) VALUES (?, ?)').bind(name, parent_id || null).run();
     return c.json({ success: true });
 });
 
 // API: Reorder Folders
 app.put('/folders/reorder', async (c) => {
-    const { orderedIds } = await c.req.json();
+    const result = s.reorderSchema.safeParse(await c.req.json());
+    if (!result.success) {
+        return c.json({ error: result.error.issues[0].message }, 400);
+    }
+    const { orderedIds } = result.data;
     const batch = orderedIds.map((id: number, index: number) => {
         return c.env.DB.prepare('UPDATE folders SET sort_order = ? WHERE id = ?').bind(index, id);
     });
@@ -157,84 +152,87 @@ app.put('/folders/reorder', async (c) => {
 
 // API: Update Folder
 app.put('/folders/:id', async (c) => {
-    const id = c.req.param('id');
-    const { name, parent_id } = await c.req.json();
-    const idValidation = v.validateId(id);
-    if (!idValidation.valid) return c.json({ error: idValidation.error }, 400);
+    const idRes = s.idSchema.safeParse(c.req.param('id'));
+    if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+    const id = idRes.data;
 
-    if (name) {
-        const nameValidation = v.validateFolderName(name);
-        if (!nameValidation.valid) return c.json({ error: nameValidation.error }, 400);
-    }
-    if (parent_id && idValidation.parsed === parseInt(parent_id.toString())) {
+    const bodyRes = s.folderSchema.partial().safeParse(await c.req.json());
+    if (!bodyRes.success) return c.json({ error: bodyRes.error.issues[0].message }, 400);
+    const { name, parent_id } = bodyRes.data;
+
+    if (parent_id === id) {
         return c.json({ error: 'Cannot move folder into itself' }, 400);
     }
-    if (parent_id !== undefined) {
-        await c.env.DB.prepare('UPDATE folders SET name = ?, parent_id = ? WHERE id = ?').bind(v.sanitizeString(name, 255), parent_id, idValidation.parsed).run();
-    } else {
-        await c.env.DB.prepare('UPDATE folders SET name = ? WHERE id = ?').bind(v.sanitizeString(name, 255), idValidation.parsed).run();
+    
+    if (parent_id) {
+        // Prevent cyclic reference: check if parent_id is a descendant of id
+        const { results } = await c.env.DB.prepare(`
+            WITH RECURSIVE descendants(id) AS (
+                SELECT id FROM folders WHERE parent_id = ?
+                UNION ALL
+                SELECT f.id FROM folders f JOIN descendants d ON f.parent_id = d.id
+            )
+            SELECT id FROM descendants WHERE id = ?
+        `).bind(id, parent_id).all();
+        if (results.length > 0) {
+            return c.json({ error: 'Cannot move folder into one of its subfolders' }, 400);
+        }
+    }
+
+    if (name !== undefined && parent_id !== undefined) {
+        await c.env.DB.prepare('UPDATE folders SET name = ?, parent_id = ? WHERE id = ?').bind(name, parent_id, id).run();
+    } else if (name !== undefined) {
+        await c.env.DB.prepare('UPDATE folders SET name = ? WHERE id = ?').bind(name, id).run();
+    } else if (parent_id !== undefined) {
+        await c.env.DB.prepare('UPDATE folders SET parent_id = ? WHERE id = ?').bind(parent_id, id).run();
     }
     return c.json({ success: true });
 });
 
-async function softDeleteFolder(db: any, folderId: any) {
-    const idsToProcess = [folderId];
-    const allFolderIds = [folderId];
-    while (idsToProcess.length > 0) {
-        const currentId = idsToProcess.shift();
-        const { results } = await db.prepare('SELECT id FROM folders WHERE parent_id = ? AND is_deleted = 0').bind(currentId).all();
-        for (const row of results) {
-            allFolderIds.push(row.id as number);
-            idsToProcess.push(row.id as number);
+async function softDeleteFolder(db: D1Database, folderId: number) {
+    // 递归获取所有子文件夹 ID (SQLite Recursive CTE)
+    const { results } = await db.prepare('WITH RECURSIVE sub(id) AS (SELECT id FROM folders WHERE id = ? UNION ALL SELECT f.id FROM folders f JOIN sub ON f.parent_id = sub.id WHERE f.is_deleted = 0) SELECT id FROM sub').bind(folderId).all();
+    const allIds = results.map(r => r.id);
+
+    if (allIds.length > 0) {
+        const batch = [];
+        for (const id of allIds) {
+            batch.push(db.prepare('UPDATE folders SET is_deleted = 1 WHERE id = ?').bind(id));
+            batch.push(db.prepare('UPDATE bookmarks SET is_deleted = 1 WHERE folder_id = ?').bind(id));
         }
+        await db.batch(batch);
     }
-    const batch = [];
-    for (const id of allFolderIds) {
-        batch.push(db.prepare('UPDATE bookmarks SET is_deleted = 1 WHERE folder_id = ?').bind(id));
-        batch.push(db.prepare('UPDATE folders SET is_deleted = 1 WHERE id = ?').bind(id));
-    }
-    if (batch.length > 0) await db.batch(batch);
 }
+
 
 // API: Delete Folder
 app.delete('/folders/:id', async (c) => {
-    const id = c.req.param('id');
-    const idValidation = v.validateId(id);
-    if (!idValidation.valid) return c.json({ error: idValidation.error }, 400);
-    await softDeleteFolder(c.env.DB, idValidation.parsed!);
+    const idRes = s.idSchema.safeParse(c.req.param('id'));
+    if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+    await softDeleteFolder(c.env.DB, idRes.data);
     return c.json({ success: true });
 });
 
 // API: Create Bookmark
 app.post('/bookmarks', async (c) => {
-    const { title, url, folder_id } = await c.req.json();
-    const titleValidation = v.validateBookmarkTitle(title);
-    if (!titleValidation.valid) return c.json({ error: titleValidation.error }, 400);
-    const urlValidation = v.validateUrl(url);
-    if (!urlValidation.valid) return c.json({ error: urlValidation.error }, 400);
+    const body = await c.req.json();
+    const result = s.bookmarkSchema.safeParse(body);
+    if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
+    const { title, url, folder_id } = result.data;
 
-    let folderId = null;
-    if (folder_id !== null && folder_id !== undefined) {
-        const idValidation = v.validateId(folder_id);
-        if (!idValidation.valid) return c.json({ error: idValidation.error }, 400);
-        folderId = idValidation.parsed;
-    }
-    await c.env.DB.prepare('INSERT INTO bookmarks (title, url, folder_id) VALUES (?, ?, ?)').bind(v.sanitizeString(title, 500), urlValidation.sanitized, folderId).run();
+    await c.env.DB.prepare('INSERT INTO bookmarks (title, url, folder_id) VALUES (?, ?, ?)').bind(title, url, folder_id || null).run();
     return c.json({ success: true });
 });
 
 // API: Reorder Bookmarks
 app.put('/bookmarks/reorder', async (c) => {
     try {
-        const { orderedIds } = await c.req.json();
-        if (!Array.isArray(orderedIds) || orderedIds.length === 0) return c.json({ error: 'Invalid input' }, 400);
-        for (let i = 0; i < orderedIds.length; i++) {
-            if (!v.validateId(orderedIds[i]).valid) return c.json({ error: 'Invalid ID' }, 400);
-        }
-        const now = Date.now();
+        const result = s.reorderSchema.safeParse(await c.req.json());
+        if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
+        const { orderedIds } = result.data;
+
         const batch = orderedIds.map((id: number, index: number) => {
-            const timestamp = new Date(now - (orderedIds.length - index) * 1000).toISOString();
-            return c.env.DB.prepare('UPDATE bookmarks SET created_at = ? WHERE id = ?').bind(timestamp, id);
+            return c.env.DB.prepare('UPDATE bookmarks SET sort_order = ? WHERE id = ?').bind(index, id);
         });
         await c.env.DB.batch(batch);
         return c.json({ success: true });
@@ -245,50 +243,53 @@ app.put('/bookmarks/reorder', async (c) => {
 
 // API: Update Bookmark
 app.put('/bookmarks/:id', async (c) => {
-    const id = c.req.param('id');
-    const { title, url, folder_id } = await c.req.json();
-    const idValidation = v.validateId(id);
-    if (!idValidation.valid) return c.json({ error: idValidation.error }, 400);
+    const idRes = s.idSchema.safeParse(c.req.param('id'));
+    if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+    const id = idRes.data;
 
-    if (title) {
-        if (!v.validateBookmarkTitle(title).valid) return c.json({ error: 'Invalid title' }, 400);
-    }
-    let sanitizedUrl = undefined;
-    if (url) {
-        const uv = v.validateUrl(url);
-        if (!uv.valid) return c.json({ error: uv.error }, 400);
-        sanitizedUrl = uv.sanitized;
-    }
-    if (folder_id !== undefined) {
-        await c.env.DB.prepare('UPDATE bookmarks SET title = ?, url = ?, folder_id = ? WHERE id = ?').bind(v.sanitizeString(title, 500), sanitizedUrl, folder_id, idValidation.parsed).run();
-    } else {
-        await c.env.DB.prepare('UPDATE bookmarks SET title = ?, url = ? WHERE id = ?').bind(v.sanitizeString(title, 500), sanitizedUrl, idValidation.parsed).run();
+    const bodyRes = s.bookmarkSchema.partial().safeParse(await c.req.json());
+    if (!bodyRes.success) return c.json({ error: bodyRes.error.issues[0].message }, 400);
+    const { title, url, folder_id } = bodyRes.data;
+
+    if (title && url && folder_id !== undefined) {
+        await c.env.DB.prepare('UPDATE bookmarks SET title = ?, url = ?, folder_id = ? WHERE id = ?').bind(title, url, folder_id, id).run();
+    } else if (title && url) {
+        await c.env.DB.prepare('UPDATE bookmarks SET title = ?, url = ? WHERE id = ?').bind(title, url, id).run();
+    } else if (title) {
+        await c.env.DB.prepare('UPDATE bookmarks SET title = ? WHERE id = ?').bind(title, id).run();
+    } else if (url) {
+        await c.env.DB.prepare('UPDATE bookmarks SET url = ? WHERE id = ?').bind(url, id).run();
+    } else if (folder_id !== undefined) {
+        await c.env.DB.prepare('UPDATE bookmarks SET folder_id = ? WHERE id = ?').bind(folder_id, id).run();
     }
     return c.json({ success: true });
 });
 
 // API: Delete Bookmark
 app.delete('/bookmarks/:id', async (c) => {
-    const id = c.req.param('id');
-    const idValidation = v.validateId(id);
-    if (!idValidation.valid) return c.json({ error: idValidation.error }, 400);
-    await c.env.DB.prepare('UPDATE bookmarks SET is_deleted = 1 WHERE id = ?').bind(idValidation.parsed).run();
+    const idRes = s.idSchema.safeParse(c.req.param('id'));
+    if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+    await c.env.DB.prepare('UPDATE bookmarks SET is_deleted = 1 WHERE id = ?').bind(idRes.data).run();
     return c.json({ success: true });
 });
 
 function generateNetscapeHTML(folders: any[], bookmarks: any[], parentId: number | null = null, indent: string = ''): string {
+    const escapeHtml = (s: any) => {
+        if (!s) return '';
+        return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    };
     let html = '';
     const f = folders.filter(f => f.parent_id === parentId);
     const b = bookmarks.filter(b => b.folder_id === parentId);
     if (f.length > 0 || b.length > 0) {
         html += `\n${indent}<DL><p>\n`;
         for (const folder of f) {
-            html += `${indent}    <DT><H3>${folder.name}</H3>\n`;
+            html += `${indent}    <DT><H3>${escapeHtml(folder.name)}</H3>\n`;
             html += generateNetscapeHTML(folders, bookmarks, folder.id, indent + '    ');
             html += `${indent}    </DT>\n`;
         }
         for (const bookmark of b) {
-            html += `${indent}    <DT><A HREF="${bookmark.url}">${bookmark.title}</A>\n`;
+            html += `${indent}    <DT><A HREF="${escapeHtml(bookmark.url)}">${escapeHtml(bookmark.title)}</A>\n`;
         }
         html += `${indent}</DL><p>\n`;
     }
@@ -297,8 +298,6 @@ function generateNetscapeHTML(folders: any[], bookmarks: any[], parentId: number
 
 // API: Get Trash
 app.get('/trash', async (c) => {
-    const secret = c.get('sessionSecret');
-    if (!await getSignedCookie(c, secret, 'auth')) return c.json({ error: 'Unauthorized' }, 401);
     const { results: folders } = await c.env.DB.prepare('SELECT * FROM folders WHERE is_deleted = 1 ORDER BY name').all();
     const { results: bookmarks } = await c.env.DB.prepare('SELECT * FROM bookmarks WHERE is_deleted = 1 ORDER BY created_at DESC').all();
     return c.json({ folders, bookmarks });
@@ -306,27 +305,27 @@ app.get('/trash', async (c) => {
 
 // API: Restore/PermanentDelete (Simplified for brevity as exact same logic)
 app.post('/restore/folders/:id', async (c) => {
-    const id = c.req.param('id');
-    if (!v.validateId(id).valid) return c.json({ error: 'Invalid ID' }, 400);
-    await c.env.DB.prepare('UPDATE folders SET is_deleted = 0 WHERE id = ?').bind(id).run();
+    const idRes = s.idSchema.safeParse(c.req.param('id'));
+    if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+    await c.env.DB.prepare('UPDATE folders SET is_deleted = 0 WHERE id = ?').bind(idRes.data).run();
     return c.json({ success: true });
 });
 app.post('/restore/bookmarks/:id', async (c) => {
-    const id = c.req.param('id');
-    if (!v.validateId(id).valid) return c.json({ error: 'Invalid ID' }, 400);
-    await c.env.DB.prepare('UPDATE bookmarks SET is_deleted = 0 WHERE id = ?').bind(id).run();
+    const idRes = s.idSchema.safeParse(c.req.param('id'));
+    if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+    await c.env.DB.prepare('UPDATE bookmarks SET is_deleted = 0 WHERE id = ?').bind(idRes.data).run();
     return c.json({ success: true });
 });
 app.delete('/trash/folders/:id', async (c) => {
-    const id = c.req.param('id');
-    if (!v.validateId(id).valid) return c.json({ error: 'Invalid ID' }, 400);
-    await c.env.DB.prepare('DELETE FROM folders WHERE id = ?').bind(id).run();
+    const idRes = s.idSchema.safeParse(c.req.param('id'));
+    if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+    await c.env.DB.prepare('DELETE FROM folders WHERE id = ?').bind(idRes.data).run();
     return c.json({ success: true });
 });
 app.delete('/trash/bookmarks/:id', async (c) => {
-    const id = c.req.param('id');
-    if (!v.validateId(id).valid) return c.json({ error: 'Invalid ID' }, 400);
-    await c.env.DB.prepare('DELETE FROM bookmarks WHERE id = ?').bind(id).run();
+    const idRes = s.idSchema.safeParse(c.req.param('id'));
+    if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+    await c.env.DB.prepare('DELETE FROM bookmarks WHERE id = ?').bind(idRes.data).run();
     return c.json({ success: true });
 });
 app.delete('/trash/empty', async (c) => {
@@ -335,10 +334,8 @@ app.delete('/trash/empty', async (c) => {
 });
 
 app.get('/export', async (c) => {
-    const secret = c.get('sessionSecret');
-    if (!await getSignedCookie(c, secret, 'auth')) return c.json({ error: 'Unauthorized' }, 401);
-    const { results: folders } = await c.env.DB.prepare('SELECT * FROM folders').all();
-    const { results: bookmarks } = await c.env.DB.prepare('SELECT * FROM bookmarks').all();
+    const { results: folders } = await c.env.DB.prepare('SELECT * FROM folders WHERE is_deleted = 0').all();
+    const { results: bookmarks } = await c.env.DB.prepare('SELECT * FROM bookmarks WHERE is_deleted = 0').all();
     let html = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <!-- This is an automatically generated file.
      It will be read and overwritten.
@@ -353,15 +350,19 @@ app.get('/export', async (c) => {
     return c.body(html);
 });
 
+// API: Import
 app.post('/import', async (c) => {
-    const secret = c.get('sessionSecret');
-    if (!await getSignedCookie(c, secret, 'auth')) return c.json({ error: 'Unauthorized' }, 401);
     const body = await c.req.text();
-    const lines = body.split('\n');
+    const stripTags = (s: string) => s.replace(/<[^>]*>/g, '').trim();
+    
+    // Group 1: DL/ /DL tags, Group 2: H3 content, Group 3: A HREF, Group 4: A content
+    const tokens = body.matchAll(/(<(?:DL|\/DL).*?>)|<H3.*?>(.*?)<\/H3>|<A.*?HREF\s*=\s*["']?([^"'\s>]+)["']?.*?>(.*?)<\/A>/gis);
+    
     const stack: (number | null)[] = [null];
     let lastFolderId: number | null = null;
     const bookmarkBatch: any[] = [];
     const BATCH_SIZE = 50;
+
     const flushBookmarks = async () => {
         if (bookmarkBatch.length === 0) return;
         const stmts = bookmarkBatch.map(b => {
@@ -370,32 +371,34 @@ app.post('/import', async (c) => {
         await c.env.DB.batch(stmts);
         bookmarkBatch.length = 0;
     };
-    for (let line of lines) {
-        line = line.trim();
-        if (/<DL>/i.test(line)) stack.push(lastFolderId);
-        else if (/<\/DL>/i.test(line)) stack.pop();
-        else if (/<H3.*?>(.*?)<\/H3>/i.test(line)) {
+
+    for (const match of tokens) {
+        if (match[1]) { // <DL> or </DL>
+            const tag = match[1].toUpperCase();
+            if (tag.includes('/DL')) {
+                if (stack.length > 1) stack.pop();
+            } else {
+                stack.push(lastFolderId);
+            }
+        } else if (match[2] !== undefined) { // <H3>content</H3>
             await flushBookmarks();
-            const match = line.match(/<H3.*?>(.*?)<\/H3>/i);
-            if (match) {
-                const name = match[1];
-                const parentId = stack[stack.length - 1];
-                const existing: any = await c.env.DB.prepare('SELECT id FROM folders WHERE name = ? AND parent_id IS ?').bind(name, parentId).first();
-                if (existing) lastFolderId = existing.id;
-                else {
-                    const { meta } = await c.env.DB.prepare('INSERT INTO folders (name, parent_id) VALUES (?, ?)').bind(name, parentId).run();
-                    lastFolderId = meta.last_row_id as number;
-                }
+            const folderName = stripTags(match[2]);
+            if (!folderName) continue;
+            
+            const parentId = stack[stack.length - 1];
+            const existing: any = await c.env.DB.prepare('SELECT id FROM folders WHERE name = ? AND parent_id IS ?').bind(folderName, parentId).first();
+            if (existing) {
+                lastFolderId = existing.id;
+            } else {
+                const { meta } = await c.env.DB.prepare('INSERT INTO folders (name, parent_id) VALUES (?, ?)').bind(folderName, parentId).run();
+                lastFolderId = meta.last_row_id as number;
             }
-        } else if (/<A.*?HREF="(.*?)".*?>(.*?)<\/A>/i.test(line)) {
-            const match = line.match(/<A.*?HREF="(.*?)".*?>(.*?)<\/A>/i);
-            if (match) {
-                const url = match[1];
-                const title = match[2];
-                const parentId = stack[stack.length - 1];
-                bookmarkBatch.push({ title, url, folderId: parentId });
-                if (bookmarkBatch.length >= BATCH_SIZE) await flushBookmarks();
-            }
+        } else if (match[3]) { // <A HREF="url">content</A>
+            const url = match[3];
+            const title = stripTags(match[4] || url) || url;
+            const parentId = stack[stack.length - 1];
+            bookmarkBatch.push({ title, url, folderId: parentId });
+            if (bookmarkBatch.length >= BATCH_SIZE) await flushBookmarks();
         }
     }
     await flushBookmarks();

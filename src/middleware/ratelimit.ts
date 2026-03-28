@@ -7,26 +7,6 @@ export async function rateLimitMiddleware(c: Context<{ Bindings: Bindings; Varia
         return next();
     }
 
-    // CSRF Check
-    if (['POST', 'PUT', 'DELETE'].includes(c.req.method)) {
-        const origin = c.req.header('origin');
-        const referer = c.req.header('referer');
-        const host = c.req.header('host');
-
-        // Allow extensions and same-origin requests
-        const isExtension = origin?.startsWith('chrome-extension://') || origin?.startsWith('moz-extension://') ||
-            referer?.startsWith('chrome-extension://') || referer?.startsWith('moz-extension://');
-
-        if (!isExtension && host) {
-            if (origin && !origin.includes(host)) {
-                return c.json({ error: 'Invalid Origin' }, 403);
-            }
-            if (referer && !referer.includes(host)) {
-                return c.json({ error: 'Invalid Referer' }, 403);
-            }
-        }
-    }
-
     const config = getConfig(c.env);
     if (!c.env.RATE_LIMIT_KV) {
         // Fallback if KV is not bound

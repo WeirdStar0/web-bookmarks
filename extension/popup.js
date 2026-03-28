@@ -287,17 +287,13 @@ searchInput.addEventListener('input', debounce(async (e) => {
     }
 
     try {
-        const res = await fetch(`${API_BASE}/api/data`, { credentials: 'include' });
+        const res = await fetch(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`, { credentials: 'include' });
         if (res.ok) {
             const data = await res.json();
-            const bookmarks = data.bookmarks.filter(b =>
-                b.title.toLowerCase().includes(query.toLowerCase()) ||
-                b.url.toLowerCase().includes(query.toLowerCase())
-            );
-            renderSearchResults(bookmarks);
+            renderSearchResults(data.bookmarks || []);
         }
     } catch (err) {
-        console.error(err);
+        console.error('Search error:', err);
     }
 }, 300));
 

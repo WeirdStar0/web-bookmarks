@@ -20,12 +20,25 @@ import { de } from './locales/de';
 import { ru } from './locales/ru';
 import { pt } from './locales/pt';
 import { it } from './locales/it';
+import { csrf } from 'hono/csrf';
 
 const locales: Record<string, any> = { en, zh, zhtw, ja, ko, es, fr, de, ru, pt, it };
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 app.use('*', logger());
+app.use('*', csrf({
+    origin: (origin, c) => {
+        // Allow extensions and same domain
+        if (origin.startsWith('chrome-extension://')) return true;
+        if (origin.startsWith('moz-extension://')) return true;
+        const host = c.req.header('host');
+        if (host && origin.includes(host)) return true;
+        // Dev
+        if (origin.includes('localhost') || origin.includes('127.0.0.1')) return true;
+        return false;
+    }
+}));
 app.use('/api/*', cors({
     origin: (origin) => {
         // Allow Localhost (Dev)
@@ -78,9 +91,9 @@ app.notFound((c) => {
     return c.json({ error: 'Not Found', message: message }, 404);
 });
 
-// Middlewares
-app.use('/api/*', rateLimitMiddleware);
+// Middlewares - Order matters! initMiddleware MUST be first to set sessionSecret
 app.use('*', initMiddleware);
+app.use('/api/*', rateLimitMiddleware);
 app.use('*', authMiddleware);
 
 // Routes

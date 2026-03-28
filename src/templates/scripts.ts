@@ -127,6 +127,10 @@ export const scripts = (t: any) => `
                 async loadData() {
                     const res = await fetch('/api/data');
                     if (res.status === 401) throw new Error('Unauthorized');
+                    if (!res.ok) {
+                        console.error('loadData failed with status:', res.status);
+                        return; // Don't throw - keeps loggedIn = true, avoids false logout
+                    }
                     const data = await res.json();
                     this.folders = data.folders;
                     this.bookmarks = data.bookmarks;

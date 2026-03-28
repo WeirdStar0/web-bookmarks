@@ -3,6 +3,8 @@ import { Bindings, Variables } from '../types';
 import { INIT_SQL } from '../db/schema';
 import { getSettings, hashPassword } from '../utils/common';
 
+let instanceSecret: string | null = null;
+
 export async function initMiddleware(c: Context<{ Bindings: Bindings; Variables: Variables }>, next: Next) {
     const envSecret = c.env.SECRET_KEY;
 
@@ -21,31 +23,34 @@ export async function initMiddleware(c: Context<{ Bindings: Bindings; Variables:
         }
     }
 
-    // 2. Dynamic Secret Logic
-    let dynamicSecret = envSecret;
-    try {
-        const dbSecretResult = await c.env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind('secret_key').first();
-        if (dbSecretResult) {
-            dynamicSecret = dbSecretResult.value as string;
+    // 2. Dynamic Secret Logic with Instance Cache
+    if (!instanceSecret) {
+        if (envSecret) {
+            instanceSecret = envSecret;
         } else {
-            // Generate and save new secret if not exists
-            const newSecret = crypto.randomUUID();
             try {
-                // Try insert
-                await c.env.DB.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').bind('secret_key', newSecret).run();
-                dynamicSecret = newSecret;
-            } catch (insertErr) {
-                // Concurrency fallback
-                const finalResult = await c.env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind('secret_key').first();
-                dynamicSecret = (finalResult?.value as string) || newSecret;
+                const dbSecretResult = await c.env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind('secret_key').first() as any;
+                if (dbSecretResult) {
+                    instanceSecret = dbSecretResult.value as string;
+                } else {
+                    const newSecret = crypto.randomUUID();
+                    try {
+                        await c.env.DB.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').bind('secret_key', newSecret).run();
+                        instanceSecret = newSecret;
+                    } catch (insErr) {
+                        // Concurrency: someone else might have inserted it
+                        const retry = await c.env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind('secret_key').first() as any;
+                        instanceSecret = retry?.value || newSecret;
+                    }
+                }
+            } catch (e) {
+                // Critical Fallback: Use one-time stable fallback for this instance duration
+                instanceSecret = 'stable-instance-fallback-' + Date.now();
             }
         }
-    } catch (e) {
-        // Ignore
     }
 
-    // Ensure dynamicSecret is a string (fallback if undefined)
-    c.set('sessionSecret', dynamicSecret || 'default-secret');
+    c.set('sessionSecret', instanceSecret || 'default-secret');
 
     // 3. Init Default Admin
     try {
@@ -55,8 +60,6 @@ export async function initMiddleware(c: Context<{ Bindings: Bindings; Variables:
             try {
                 await c.env.DB.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').bind('username', 'admin').run();
                 await c.env.DB.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').bind('password', defaultPassHash).run();
-                // Invalidate cache
-                // cachedSettings is handled in common.ts, but we might need to force reload or wait for TTL
             } catch (e) {
                 console.error("Failed to init default admin", e);
             }
