@@ -80,7 +80,7 @@ Click the **Deploy to Cloudflare Workers** button. It will:
    npx wrangler login
    npx wrangler d1 create bookmarks-db
    # Fill database_id into wrangler.toml under [[d1_databases]]
-   npm run migrate:remote
+   npm run db:reset:remote
    ```
 
 3. **Set Secret and Deploy**
@@ -116,7 +116,21 @@ Add to `.dev.vars`: `SECRET_KEY=your-random-key`
 ```bash
 npm run dev
 ```
-Visit `http://localhost:8787`. Default: `admin` / `12345`
+Visit `http://localhost:8787`. Default: `admin` / `123456`
+
+Frontend assets are generated locally. Do not edit generated files directly:
+- `src/templates/appAsset.ts` from `npm run build:app-asset`
+- `src/templates/appCssAsset.ts` from `npm run build:app-css`
+- `src/templates/vendorAsset.ts` from `npm run build:vendor-asset`
+
+Source ownership is:
+- `src/client/app.js` and `src/client/fragments/` for app logic
+- `src/client/styles.css` for Tailwind input
+- `src/client/vendor.js` for Alpine.js and collapse plugin bootstrap
+
+`npm run dev`, `npm test`, and `npm run deploy` regenerate these assets automatically first.
+
+Use `npm run check` as the pre-commit and pre-deploy quality gate. It runs asset generation, TypeScript, ESLint, and tests in sequence.
 
 ---
 
@@ -166,8 +180,9 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 ### 3. Reset Password
 ```bash
-npx wrangler d1 execute bookmarks-db --remote --command="UPDATE settings SET value='newpassword' WHERE key='password'"
+npm run db:reset:remote
 ```
+Passwords are stored as hashes, so writing plaintext into `settings.password` is no longer valid. After reset, the default admin credentials are `admin` / `123456`.
 
 ## 🔧 Configuration
 

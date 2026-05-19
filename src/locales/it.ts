@@ -11,8 +11,8 @@ export const it = {
         username: "Nome utente",
         password: "Password",
         loginButton: "Accedi",
-        usernamePlaceholder: "admin",
-        passwordPlaceholder: "••••••"
+        usernamePlaceholder: "Inserisci il nome utente",
+        passwordPlaceholder: "Inserisci la password"
     },
     dashboard: {
         title: "Preferiti",

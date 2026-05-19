@@ -1,6 +1,10 @@
 import { Bindings } from '../types';
 import { D1Database } from '@cloudflare/workers-types';
 
+type SettingsRow = {
+    key: string;
+    value: string;
+};
 
 // V1: SHA-256 (Legacy)
 export async function hashPassword(password: string): Promise<string> {
@@ -51,6 +55,10 @@ function hexToBuf(hex: string): Uint8Array {
 
 export function getConfig(env: Bindings) {
     return {
+        allowedExtensionOrigins: (env.ALLOWED_EXTENSION_ORIGINS || '')
+            .split(',')
+            .map(origin => origin.trim())
+            .filter(Boolean),
         sessionMaxAge: parseInt(env.SESSION_MAX_AGE || '604800'), // 7 days
         rateLimitMax: parseInt(env.RATE_LIMIT_MAX || '100'),
         rateLimitWindow: parseInt(env.RATE_LIMIT_WINDOW || '60'), // 60 seconds
@@ -59,9 +67,9 @@ export function getConfig(env: Bindings) {
 
 
 export async function getSettings(db: D1Database): Promise<Record<string, string>> {
-    const { results } = await db.prepare('SELECT key, value FROM settings').all();
+    const { results } = await db.prepare('SELECT key, value FROM settings').all<SettingsRow>();
     const settings: Record<string, string> = {};
-    results.forEach((row: any) => {
+    results.forEach((row) => {
         settings[row.key] = row.value;
     });
     return settings;

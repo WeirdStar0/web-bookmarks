@@ -8,7 +8,8 @@
         "moduleResolution": "node",
         "types": [
             "@cloudflare/workers-types",
-            "hono"
+            "hono",
+            "vitest/globals"
         ],
         "resolveJsonModule": true,
         "allowJs": true,
@@ -21,6 +22,7 @@
         "skipLibCheck": true
     },
     "include": [
-        "src/**/*.ts"
+        "src/**/*.ts",
+        "tests/**/*.ts"
     ]
 }

@@ -11,8 +11,8 @@ export const zh = {
         username: "账号",
         password: "密码",
         loginButton: "登录",
-        usernamePlaceholder: "admin",
-        passwordPlaceholder: "••••••"
+        usernamePlaceholder: "请输入账号",
+        passwordPlaceholder: "请输入密码"
     },
     dashboard: {
         title: "Bookmarks",

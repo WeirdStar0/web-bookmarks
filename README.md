@@ -82,7 +82,7 @@
    npx wrangler login
    npx wrangler d1 create bookmarks-db
    # 将输出的 database_id 填入 wrangler.toml (必须在 [[d1_databases]] 下填写)
-   npm run migrate:remote
+   npm run db:reset:remote
    ```
 
 3. **设置密钥并部署**
@@ -124,7 +124,21 @@ openssl rand -base64 32
 ```bash
 npm run dev
 ```
-访问 `http://localhost:8787`。默认账号：`admin` / 密码：`12345`
+访问 `http://localhost:8787`。默认账号：`admin` / 密码：`123456`
+
+前端资源由本地构建链自动生成，不要直接手改生成产物：
+- `src/templates/appAsset.ts` 由 `npm run build:app-asset` 生成
+- `src/templates/appCssAsset.ts` 由 `npm run build:app-css` 生成
+- `src/templates/vendorAsset.ts` 由 `npm run build:vendor-asset` 生成
+
+其中：
+- `src/client/app.js` 和 `src/client/fragments/` 负责应用主逻辑
+- `src/client/styles.css` 负责 Tailwind 输入
+- `src/client/vendor.js` 负责 Alpine.js 与 collapse 插件初始化
+
+`npm run dev`、`npm test` 和 `npm run deploy` 前都会自动先生成这些前端资产。
+
+建议把 `npm run check` 当成提交前和部署前的标准质量门。它会串行执行前端资产生成、TypeScript 检查、ESLint 和测试。
 
 ---
 
@@ -135,6 +149,15 @@ npm run dev
 1. 创建 KV 命名空间：`npx wrangler kv:namespace create RATE_LIMIT_KV`
 2. 将返回的 `id` 填入 `wrangler.toml` 中的 `kv_namespaces` 部分。
 3. 重新运行 `npm run deploy`。
+
+### 允许浏览器扩展访问 (可选)
+默认不会放行任意浏览器扩展源。需要显式配置允许的扩展 Origin：
+1. 在扩展商店或开发者模式中确认扩展 ID。
+2. 在 `wrangler.toml` 或 Cloudflare Dashboard 变量里设置 `ALLOWED_EXTENSION_ORIGINS`。
+3. 多个值用英文逗号分隔，例如：
+   ```toml
+   ALLOWED_EXTENSION_ORIGINS = "chrome-extension://abcdefghijklmnopqrstuvwxyzabcdef"
+   ```
 
 ## 🧩 浏览器扩展 (Browser Extension)
 
@@ -177,9 +200,15 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 - 如果更换了密钥，请清除浏览器 Cookie 后重新登录。
 
 ### 3. 如何重置密码？
+当前密码在数据库中以哈希形式存储，不能直接把明文密码写进 `settings.password`。
+
+推荐做法：
+- 登录后在页面“设置”中修改用户名和密码
+- 如果你只是想回到默认管理员密码，可以删除 `settings` 表中的 `password` 记录后再走初始化流程，或直接重置数据库：
 ```bash
-npx wrangler d1 execute bookmarks-db --remote --command="UPDATE settings SET value='newpassword' WHERE key='password'"
+npm run db:reset:remote
 ```
+重置后默认账号会恢复为 `admin` / `123456`。
 
 ### 4. 速率限制不生效？
 - 确保已创建 KV 命名空间：`npx wrangler kv:namespace create RATE_LIMIT_KV`
@@ -201,6 +230,7 @@ npx wrangler d1 execute bookmarks-db --remote --command="UPDATE settings SET val
 ```
 # .dev.vars
 SECRET_KEY=your-secret-key
+ALLOWED_EXTENSION_ORIGINS=chrome-extension://your-extension-id
 ```
 
 ## 📖 API 文档
@@ -276,7 +306,7 @@ SECRET_KEY=your-secret-key
 
 ## 🔒 安全建议
 
-1. **修改默认密码**: 部署后立即登录并修改默认的用户名和密码
+1. **修改默认密码**: 部署后立即登录并修改默认的用户名和密码（默认密码为 `123456`）
 2. **使用 HTTPS**: Cloudflare Workers 默认提供 HTTPS
 3. **定期备份**: 定期导出书签数据作为备份
 4. **API Token 安全**: 不要将 Cloudflare API Token 提交到代码库

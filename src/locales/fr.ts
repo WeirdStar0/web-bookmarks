@@ -11,8 +11,8 @@ export const fr = {
         username: "Nom d'utilisateur",
         password: "Mot de passe",
         loginButton: "Connexion",
-        usernamePlaceholder: "admin",
-        passwordPlaceholder: "••••••"
+        usernamePlaceholder: "Saisissez votre identifiant",
+        passwordPlaceholder: "Saisissez votre mot de passe"
     },
     dashboard: {
         title: "Favoris",

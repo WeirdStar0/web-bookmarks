@@ -11,8 +11,8 @@ export const pt = {
         username: "Usuário",
         password: "Senha",
         loginButton: "Entrar",
-        usernamePlaceholder: "admin",
-        passwordPlaceholder: "••••••"
+        usernamePlaceholder: "Digite seu usuário",
+        passwordPlaceholder: "Digite sua senha"
     },
     dashboard: {
         title: "Favoritos",

@@ -11,8 +11,8 @@ export const en = {
         username: "Username",
         password: "Password",
         loginButton: "Login",
-        usernamePlaceholder: "admin",
-        passwordPlaceholder: "••••••"
+        usernamePlaceholder: "Enter username",
+        passwordPlaceholder: "Enter password"
     },
     dashboard: {
         title: "Bookmarks",

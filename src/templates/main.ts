@@ -1,4 +1,6 @@
-export const main = (t: any) => `
+import type { TemplateTranslations } from './types';
+
+export const main = (t: TemplateTranslations) => `
     <!-- Main Content -->
     <div x-show="loggedIn" class="h-screen flex flex-col" x-cloak>
         <!-- Navbar -->

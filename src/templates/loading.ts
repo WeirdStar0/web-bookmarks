@@ -1,4 +1,6 @@
-export const loading = (t: any) => `
+import type { TemplateTranslations } from './types';
+
+export const loading = (t: TemplateTranslations) => `
     <!-- Loading Overlay -->
     <div x-show="isLoading" class="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center" x-cloak>
         <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl flex flex-col items-center">

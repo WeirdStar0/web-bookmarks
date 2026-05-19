@@ -202,14 +202,14 @@ export function validateId(id: string | number): { valid: boolean; error?: strin
 /**
  * 验证分页参数
  */
-export function validatePagination(page?: any, limit?: any): {
+export function validatePagination(page?: string | number, limit?: string | number): {
     valid: boolean;
     offset?: number;
     limit?: number;
     error?: string;
 } {
-    const parsedPage = parseInt(page) || 1;
-    const parsedLimit = parseInt(limit) || 20;
+    const parsedPage = Number.parseInt(String(page ?? ''), 10) || 1;
+    const parsedLimit = Number.parseInt(String(limit ?? ''), 10) || 20;
 
     if (parsedPage < 1) {
         return { valid: false, error: '页码必须大于 0' };

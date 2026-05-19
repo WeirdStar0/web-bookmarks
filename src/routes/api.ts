@@ -1,11 +1,84 @@
 import { Hono } from 'hono';
-import { setSignedCookie, deleteCookie, getSignedCookie } from 'hono/cookie';
+import { setSignedCookie, deleteCookie } from 'hono/cookie';
+import type { D1Database } from '@cloudflare/workers-types';
 import { Bindings, Variables } from '../types';
 import { getConfig, getSettings, hashPassword, hashPasswordV2, invalidateSettingsCache } from '../utils/common';
-import * as v from '../utils/validators';
 import * as s from '../utils/schemas';
 
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
+
+type FolderRow = {
+    id: number;
+    name: string;
+    parent_id: number | null;
+};
+
+type BookmarkRow = {
+    id: number;
+    title: string;
+    url: string;
+    folder_id: number | null;
+};
+
+type ImportBookmark = {
+    title: string;
+    url: string;
+    folderId: number | null;
+};
+
+async function getFolderSubtreeIds(db: D1Database, folderId: number, deletedState?: 0 | 1) {
+    const conditions = deletedState === undefined ? '' : ' AND f.is_deleted = ?';
+    const rootConditions = deletedState === undefined ? '' : ' AND is_deleted = ?';
+    const bindings = deletedState === undefined
+        ? [folderId]
+        : [folderId, deletedState, deletedState];
+
+    const { results } = await db.prepare(`
+        WITH RECURSIVE sub(id) AS (
+            SELECT id FROM folders WHERE id = ?${rootConditions}
+            UNION ALL
+            SELECT f.id
+            FROM folders f
+            JOIN sub ON f.parent_id = sub.id
+            WHERE 1 = 1${conditions}
+        )
+        SELECT id FROM sub
+    `).bind(...bindings).all<{ id: number }>();
+
+    return results.map(row => row.id);
+}
+
+async function markFolderSubtreeDeleted(db: D1Database, folderId: number, isDeleted: 0 | 1) {
+    const allIds = await getFolderSubtreeIds(db, folderId, isDeleted === 1 ? 0 : 1);
+
+    if (allIds.length === 0) {
+        return;
+    }
+
+    const batch = allIds.flatMap((id) => ([
+        db.prepare('UPDATE folders SET is_deleted = ? WHERE id = ?').bind(isDeleted, id),
+        db.prepare('UPDATE bookmarks SET is_deleted = ? WHERE folder_id = ?').bind(isDeleted, id),
+    ]));
+
+    await db.batch(batch);
+}
+
+async function permanentlyDeleteFolderSubtree(db: D1Database, folderId: number) {
+    const allIds = await getFolderSubtreeIds(db, folderId, 1);
+
+    if (allIds.length === 0) {
+        return false;
+    }
+
+    const reversedIds = [...allIds].reverse();
+    const batch = reversedIds.flatMap((id) => ([
+        db.prepare('DELETE FROM bookmarks WHERE folder_id = ?').bind(id),
+        db.prepare('DELETE FROM folders WHERE id = ?').bind(id),
+    ]));
+
+    await db.batch(batch);
+    return true;
+}
 
 // API: Login
 app.post('/login', async (c) => {
@@ -190,18 +263,7 @@ app.put('/folders/:id', async (c) => {
 });
 
 async function softDeleteFolder(db: D1Database, folderId: number) {
-    // 递归获取所有子文件夹 ID (SQLite Recursive CTE)
-    const { results } = await db.prepare('WITH RECURSIVE sub(id) AS (SELECT id FROM folders WHERE id = ? UNION ALL SELECT f.id FROM folders f JOIN sub ON f.parent_id = sub.id WHERE f.is_deleted = 0) SELECT id FROM sub').bind(folderId).all();
-    const allIds = results.map(r => r.id);
-
-    if (allIds.length > 0) {
-        const batch = [];
-        for (const id of allIds) {
-            batch.push(db.prepare('UPDATE folders SET is_deleted = 1 WHERE id = ?').bind(id));
-            batch.push(db.prepare('UPDATE bookmarks SET is_deleted = 1 WHERE folder_id = ?').bind(id));
-        }
-        await db.batch(batch);
-    }
+    await markFolderSubtreeDeleted(db, folderId, 1);
 }
 
 
@@ -236,8 +298,9 @@ app.put('/bookmarks/reorder', async (c) => {
         });
         await c.env.DB.batch(batch);
         return c.json({ success: true });
-    } catch (error: any) {
-        return c.json({ error: error.message }, 500);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        return c.json({ error: message }, 500);
     }
 });
 
@@ -273,8 +336,8 @@ app.delete('/bookmarks/:id', async (c) => {
     return c.json({ success: true });
 });
 
-function generateNetscapeHTML(folders: any[], bookmarks: any[], parentId: number | null = null, indent: string = ''): string {
-    const escapeHtml = (s: any) => {
+function generateNetscapeHTML(folders: FolderRow[], bookmarks: BookmarkRow[], parentId: number | null = null, indent: string = ''): string {
+    const escapeHtml = (s: string | number | null | undefined) => {
         if (!s) return '';
         return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     };
@@ -307,7 +370,7 @@ app.get('/trash', async (c) => {
 app.post('/restore/folders/:id', async (c) => {
     const idRes = s.idSchema.safeParse(c.req.param('id'));
     if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
-    await c.env.DB.prepare('UPDATE folders SET is_deleted = 0 WHERE id = ?').bind(idRes.data).run();
+    await markFolderSubtreeDeleted(c.env.DB, idRes.data, 0);
     return c.json({ success: true });
 });
 app.post('/restore/bookmarks/:id', async (c) => {
@@ -319,12 +382,21 @@ app.post('/restore/bookmarks/:id', async (c) => {
 app.delete('/trash/folders/:id', async (c) => {
     const idRes = s.idSchema.safeParse(c.req.param('id'));
     if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
-    await c.env.DB.prepare('DELETE FROM folders WHERE id = ?').bind(idRes.data).run();
+    const deleted = await permanentlyDeleteFolderSubtree(c.env.DB, idRes.data);
+    if (!deleted) {
+        return c.json({ error: 'Folder not found in trash' }, 404);
+    }
     return c.json({ success: true });
 });
 app.delete('/trash/bookmarks/:id', async (c) => {
     const idRes = s.idSchema.safeParse(c.req.param('id'));
     if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+    const trashedBookmark = await c.env.DB.prepare('SELECT id FROM bookmarks WHERE id = ? AND is_deleted = 1')
+        .bind(idRes.data)
+        .first<{ id: number }>();
+    if (!trashedBookmark) {
+        return c.json({ error: 'Bookmark not found in trash' }, 404);
+    }
     await c.env.DB.prepare('DELETE FROM bookmarks WHERE id = ?').bind(idRes.data).run();
     return c.json({ success: true });
 });
@@ -334,8 +406,8 @@ app.delete('/trash/empty', async (c) => {
 });
 
 app.get('/export', async (c) => {
-    const { results: folders } = await c.env.DB.prepare('SELECT * FROM folders WHERE is_deleted = 0').all();
-    const { results: bookmarks } = await c.env.DB.prepare('SELECT * FROM bookmarks WHERE is_deleted = 0').all();
+    const { results: folders } = await c.env.DB.prepare('SELECT * FROM folders WHERE is_deleted = 0').all<FolderRow>();
+    const { results: bookmarks } = await c.env.DB.prepare('SELECT * FROM bookmarks WHERE is_deleted = 0').all<BookmarkRow>();
     let html = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <!-- This is an automatically generated file.
      It will be read and overwritten.
@@ -360,13 +432,14 @@ app.post('/import', async (c) => {
     
     const stack: (number | null)[] = [null];
     let lastFolderId: number | null = null;
-    const bookmarkBatch: any[] = [];
+    const bookmarkBatch: ImportBookmark[] = [];
     const BATCH_SIZE = 50;
 
     const flushBookmarks = async () => {
         if (bookmarkBatch.length === 0) return;
-        const stmts = bookmarkBatch.map(b => {
-            return c.env.DB.prepare('INSERT INTO bookmarks (title, url, folder_id) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ?)').bind(b.title, b.url, b.folderId, b.url, b.folderId);
+        const stmts = bookmarkBatch.map((bookmark) => {
+            return c.env.DB.prepare('INSERT INTO bookmarks (title, url, folder_id) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ?)')
+                .bind(bookmark.title, bookmark.url, bookmark.folderId, bookmark.url, bookmark.folderId);
         });
         await c.env.DB.batch(stmts);
         bookmarkBatch.length = 0;
@@ -386,7 +459,9 @@ app.post('/import', async (c) => {
             if (!folderName) continue;
             
             const parentId = stack[stack.length - 1];
-            const existing: any = await c.env.DB.prepare('SELECT id FROM folders WHERE name = ? AND parent_id IS ?').bind(folderName, parentId).first();
+            const existing = await c.env.DB.prepare('SELECT id FROM folders WHERE name = ? AND parent_id IS ?')
+                .bind(folderName, parentId)
+                .first<{ id: number }>();
             if (existing) {
                 lastFolderId = existing.id;
             } else {

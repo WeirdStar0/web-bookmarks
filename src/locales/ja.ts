@@ -11,8 +11,8 @@ export const ja = {
         username: "ユーザー名",
         password: "パスワード",
         loginButton: "ログイン",
-        usernamePlaceholder: "admin",
-        passwordPlaceholder: "••••••"
+        usernamePlaceholder: "ユーザー名を入力",
+        passwordPlaceholder: "パスワードを入力"
     },
     dashboard: {
         title: "ブックマーク",

@@ -11,8 +11,8 @@ export const es = {
         username: "Usuario",
         password: "Contraseña",
         loginButton: "Iniciar sesión",
-        usernamePlaceholder: "admin",
-        passwordPlaceholder: "••••••"
+        usernamePlaceholder: "Ingrese su usuario",
+        passwordPlaceholder: "Ingrese su contraseña"
     },
     dashboard: {
         title: "Marcadores",

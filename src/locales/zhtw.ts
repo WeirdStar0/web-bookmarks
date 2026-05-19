@@ -11,8 +11,8 @@ export const zhtw = {
         username: "使用者名稱",
         password: "密碼",
         loginButton: "登入",
-        usernamePlaceholder: "admin",
-        passwordPlaceholder: "••••••"
+        usernamePlaceholder: "請輸入帳號",
+        passwordPlaceholder: "請輸入密碼"
     },
     dashboard: {
         title: "書籤",

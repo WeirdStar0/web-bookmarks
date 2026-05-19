@@ -1,4 +1,6 @@
-export const login = (t: any) => `
+import type { TemplateTranslations } from './types';
+
+export const login = (t: TemplateTranslations) => `
     <!-- Login Form -->
     <div x-show="!loggedIn && !isCheckingAuth" class="min-h-screen flex items-center justify-center px-4" x-cloak>
         <div class="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 transform transition-all">

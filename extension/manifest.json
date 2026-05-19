@@ -6,8 +6,7 @@
     "description": "__MSG_extDesc__",
     "permissions": [
         "activeTab",
-        "storage",
-        "scripting"
+        "storage"
     ],
     "action": {
         "default_popup": "popup.html",
@@ -23,6 +22,8 @@
         "128": "icons/icon128.png"
     },
     "host_permissions": [
-        "<all_urls>"
+        "https://*/*",
+        "http://localhost/*",
+        "http://127.0.0.1/*"
     ]
 }

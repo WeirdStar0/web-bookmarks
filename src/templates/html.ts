@@ -1,11 +1,11 @@
+import type { TemplateTranslations } from './types';
 import { head } from './head';
 import { login } from './login';
 import { main } from './main';
 import { modals } from './modals';
-import { scripts } from './scripts';
 import { loading } from './loading';
 
-export const html = (t: any) => `
+export const html = (t: TemplateTranslations) => `
 <!DOCTYPE html>
 <html lang="${t.lang}">
 ${head(t)}
@@ -14,7 +14,6 @@ ${head(t)}
     ${login(t)}
     ${main(t)}
     ${modals(t)}
-    ${scripts(t)}
 </body>
 </html>
 `;

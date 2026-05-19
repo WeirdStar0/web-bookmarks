@@ -11,8 +11,8 @@ export const ko = {
         username: "사용자 이름",
         password: "비밀번호",
         loginButton: "로그인",
-        usernamePlaceholder: "admin",
-        passwordPlaceholder: "••••••"
+        usernamePlaceholder: "사용자 이름 입력",
+        passwordPlaceholder: "비밀번호 입력"
     },
     dashboard: {
         title: "북마크",

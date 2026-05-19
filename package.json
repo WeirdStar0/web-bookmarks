@@ -4,14 +4,22 @@
   "description": "现代化书签管理系统 - 基于 Cloudflare Workers 和 D1",
   "main": "index.js",
   "scripts": {
+    "build:app-asset": "node scripts/build_app_asset.js",
+    "build:app-css": "node scripts/build_app_css.js",
+    "build:vendor-asset": "node scripts/build_vendor_asset.js",
+    "build": "npm run build:app-asset && npm run build:app-css && npm run build:vendor-asset && npx tsc --noEmit",
+    "check": "npm run build && npm run lint && npm test",
     "dev": "wrangler dev src/index.ts",
+    "predev": "npm run build:app-asset && npm run build:app-css && npm run build:vendor-asset",
     "db:reset": "wrangler d1 execute bookmarks-db --local --file=./schema.sql && wrangler d1 execute bookmarks-db --local --file=./migrations/002_add_indexes.sql",
     "db:reset:remote": "wrangler d1 execute bookmarks-db --remote --file=./schema.sql && wrangler d1 execute bookmarks-db --remote --file=./migrations/002_add_indexes.sql",
     "db:migrate": "echo \"⚠️  DANGER: Use 'npm run db:reset' if you really want to RESET (WIPE) the database. For incremental changes, stick to manual execution for now.\"",
     "deploy": "wrangler deploy",
+    "predeploy": "npm run check",
     "lint": "eslint \"src/**/*.ts\"",
     "build:ext": "node scripts/build_extensions.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "pretest": "npm run build:app-asset && npm run build:app-css && npm run build:vendor-asset",
+    "test": "vitest run"
   },
   "keywords": [
     "bookmarks",
@@ -27,11 +35,16 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@alpinejs/collapse": "^3.14.9",
     "@cloudflare/vitest-pool-workers": "^0.11.1",
     "@cloudflare/workers-types": "^4.20251121.0",
+    "@types/node": "^24.10.1",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
+    "alpinejs": "^3.14.9",
+    "esbuild": "^0.25.11",
     "eslint": "^9.39.2",
+    "tailwindcss": "^3.4.17",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4",
     "wrangler": "^4.50.0"

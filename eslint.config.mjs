@@ -8,7 +8,7 @@ export default [
     {
         files: ["src/**/*.ts"],
         languageOptions: {
-            parser: parser,
+            parser,
             parserOptions: {
                 project: "./tsconfig.json",
             },

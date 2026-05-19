@@ -11,8 +11,8 @@ export const ru = {
         username: "Имя пользователя",
         password: "Пароль",
         loginButton: "Войти",
-        usernamePlaceholder: "admin",
-        passwordPlaceholder: "••••••"
+        usernamePlaceholder: "Введите имя пользователя",
+        passwordPlaceholder: "Введите пароль"
     },
     dashboard: {
         title: "Закладки",
