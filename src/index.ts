@@ -95,7 +95,7 @@ app.use('*', secureHeaders({
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-eval'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "https://www.google.com"],
+        imgSrc: ["'self'", "data:", "https://www.google.com", "https://*.gstatic.com"],
         connectSrc: ["'self'"],
         frameSrc: ["'none'"],
         objectSrc: ["'none'"],
