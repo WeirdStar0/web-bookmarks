@@ -12,7 +12,9 @@ handleUnauthorized() {
 },
 
 async apiFetch(url, options = {}) {
-    const response = await fetch(url, options);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeout));
     if (!response.ok) {
         if (response.status === 401) {
             this.handleUnauthorized();
@@ -20,21 +22,21 @@ async apiFetch(url, options = {}) {
         }
         let message = 'Request failed with status: ' + response.status;
         try {
-            const data = await response.clone().json();
-            if (data && typeof data.error === 'string' && data.error) {
-                message = data.error;
-            } else if (data && typeof data.message === 'string' && data.message) {
-                message = data.message;
-            }
-        } catch {
-            try {
-                const text = await response.clone().text();
-                if (text) {
+            const text = await response.text();
+            if (text) {
+                try {
+                    const data = JSON.parse(text);
+                    if (data && typeof data.error === 'string' && data.error) {
+                        message = data.error;
+                    } else if (data && typeof data.message === 'string' && data.message) {
+                        message = data.message;
+                    }
+                } catch {
                     message = text;
                 }
-            } catch {
-                // Keep the status-based fallback when the body is unreadable.
             }
+        } catch {
+            // Keep the status-based fallback when the body is unreadable.
         }
         throw new Error(message);
     }

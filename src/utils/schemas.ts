@@ -20,7 +20,7 @@ export const folderSchema = z.object({
 export const bookmarkSchema = z.object({
     title: z.string().min(1).max(500),
     url: z.string().url().max(2048),
-    description: z.string().max(1000).optional(),
+    description: z.string().max(1000).nullable().optional(),
     folder_id: z.number().int().positive().nullable().optional(),
 });
 

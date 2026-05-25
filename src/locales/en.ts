@@ -79,6 +79,13 @@ export const en = {
         emptyTrashDesc: "This action cannot be undone.",
         deleteWarning: "Delete",
         // JS specific
+        location: "Location",
+        dataManagement: "Data Management",
+        import: "Import",
+        export: "Export",
+        confirmTitle: "Confirm Action",
+        confirm: "Confirm",
+        leaveEmptyToKeep: "Leave empty to keep unchanged",
         rootFolder: "All Bookmarks (Root)",
         unknownFolder: "Unknown Folder",
         confirmDeleteFolderGeneric: "Are you sure you want to delete this folder?",

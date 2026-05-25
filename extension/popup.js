@@ -465,6 +465,16 @@ function renderFolderSelect(lastFolderId) {
     buildTree(null, container);
 }
 
+function escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return String(unsafe)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function renderSearchResults(bookmarks) {
     searchResults.innerHTML = '';
     if (bookmarks.length === 0) {
@@ -476,15 +486,15 @@ function renderSearchResults(bookmarks) {
         div.className = 'p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer flex items-center space-x-2.5 transition-colors';
 
         // Use Google Favicon Service
-        const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(bookmark.url).hostname}&sz=32`;
+        const faviconUrl = `https://www.google.com/s2/favicons?domain=${escapeHtml(new URL(bookmark.url).hostname)}&sz=32`;
 
         div.innerHTML = `
         <div class="flex-shrink-0 w-6 h-6 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center overflow-hidden">
             <img src="${faviconUrl}" class="w-4 h-4" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><path d=%22M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z%22></path></svg>'">
         </div>
         <div class="flex-1 min-w-0">
-            <div class="text-sm text-gray-900 dark:text-gray-200 truncate font-medium">${bookmark.title}</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400 truncate">${bookmark.url}</div>
+            <div class="text-sm text-gray-900 dark:text-gray-200 truncate font-medium">${escapeHtml(bookmark.title)}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 truncate">${escapeHtml(bookmark.url)}</div>
         </div>
     `;
         div.addEventListener('click', () => {

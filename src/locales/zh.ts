@@ -79,6 +79,13 @@ export const zh = {
         emptyTrashDesc: "此操作无法撤销。",
         deleteWarning: "删除",
         // JS specific
+        location: "位置",
+        dataManagement: "数据管理",
+        import: "导入",
+        export: "导出",
+        confirmTitle: "确认操作",
+        confirm: "确定",
+        leaveEmptyToKeep: "不修改请留空",
         rootFolder: "所有书签 (根目录)",
         unknownFolder: "未知文件夹",
         confirmDeleteFolderGeneric: "确定要删除这个文件夹吗？",

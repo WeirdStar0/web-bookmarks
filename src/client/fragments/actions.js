@@ -65,12 +65,14 @@ openBookmarkModal(bookmark = null) {
         this.editingId = bookmark.id;
         this.newBookmarkTitle = bookmark.title;
         this.newBookmarkUrl = bookmark.url;
+        this.newBookmarkDescription = bookmark.description || '';
         this.newBookmarkFolderId = bookmark.folder_id;
     } else {
         this.editMode = false;
         this.editingId = null;
         this.newBookmarkTitle = '';
         this.newBookmarkUrl = '';
+        this.newBookmarkDescription = '';
         this.newBookmarkFolderId = this.currentFolderId;
     }
     this.selectorExpanded = {};
@@ -86,12 +88,14 @@ async createBookmark() {
             await this.submitJson('/api/bookmarks/' + this.editingId, {
                 title: this.newBookmarkTitle || this.newBookmarkUrl,
                 url: this.newBookmarkUrl,
+                description: this.newBookmarkDescription || null,
                 folder_id: this.newBookmarkFolderId,
             }, 'PUT');
         } else {
             await this.submitJson('/api/bookmarks', {
                 title: this.newBookmarkTitle || this.newBookmarkUrl,
                 url: this.newBookmarkUrl,
+                description: this.newBookmarkDescription || null,
                 folder_id: this.newBookmarkFolderId,
             });
         }

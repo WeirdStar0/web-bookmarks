@@ -15,11 +15,11 @@ export const login = (t: TemplateTranslations) => `
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">${t.login.username}</label>
-                        <input type="text" x-model="loginForm.username" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="${t.login.usernamePlaceholder}">
+                        <input type="text" x-model="loginForm.username" autocomplete="username" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="${t.login.usernamePlaceholder}">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">${t.login.password}</label>
-                        <input type="password" x-model="loginForm.password" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="${t.login.passwordPlaceholder}">
+                        <input type="password" x-model="loginForm.password" autocomplete="current-password" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="${t.login.passwordPlaceholder}">
                     </div>
                 </div>
                 <div class="mt-6">

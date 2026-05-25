@@ -40,6 +40,15 @@ function isAllowedExtensionOrigin(origin: string, allowedOrigins: string[]) {
     return allowedOrigins.includes(origin);
 }
 
+function isLocalhostOrigin(origin: string): boolean {
+    try {
+        const { hostname } = new URL(origin);
+        return hostname === 'localhost' || hostname === '127.0.0.1';
+    } catch {
+        return false;
+    }
+}
+
 app.use('*', logger());
 app.use('*', csrf({
     origin: (origin, c) => {
@@ -54,7 +63,7 @@ app.use('*', csrf({
         }
         if (origin === requestOrigin) return true;
         // Dev
-        if (origin.includes('localhost') || origin.includes('127.0.0.1')) return true;
+        if (isLocalhostOrigin(origin)) return true;
         return false;
     }
 }));
@@ -62,7 +71,7 @@ app.use('/api/*', cors({
     origin: (origin, c) => {
         const config = getConfig(c.env);
         // Allow Localhost (Dev)
-        if (origin.includes('localhost') || origin.includes('127.0.0.1')) return origin;
+        if (isLocalhostOrigin(origin)) return origin;
         // Allow Web App (Prod) - Update with your actual domain
         if (origin.endsWith('.workers.dev') || origin.endsWith('.pages.dev')) return origin;
         // Allow configured extensions only

@@ -47,10 +47,31 @@ async loadData() {
 
 calculateFolderCounts() {
     this.folderCounts = {};
+    // Precompute parent→children map
+    const childrenMap = {};
+    this.folders.forEach(f => {
+        const pid = f.parent_id;
+        if (!childrenMap[pid]) childrenMap[pid] = [];
+        childrenMap[pid].push(f.id);
+    });
+    // Count direct bookmarks per folder
+    const directCounts = {};
     this.bookmarks.forEach(b => {
         if (!b.is_deleted && b.folder_id) {
-            this.folderCounts[b.folder_id] = (this.folderCounts[b.folder_id] || 0) + 1;
+            directCounts[b.folder_id] = (directCounts[b.folder_id] || 0) + 1;
         }
+    });
+    // Recursively sum children bookmarks
+    const computeTotal = (folderId) => {
+        let total = directCounts[folderId] || 0;
+        const children = childrenMap[folderId] || [];
+        for (const childId of children) {
+            total += computeTotal(childId);
+        }
+        return total;
+    };
+    this.folders.forEach(f => {
+        this.folderCounts[f.id] = computeTotal(f.id);
     });
 },
 
