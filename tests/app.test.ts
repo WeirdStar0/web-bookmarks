@@ -103,6 +103,30 @@ class MockD1Database {
             return bookmark ? ({ id: bookmark.id } as T) : null;
         }
 
+        if (normalized.startsWith('SELECT id, folder_id FROM bookmarks WHERE id = ? AND is_deleted = 1')) {
+            const id = Number(bindings[0]);
+            const bookmark = this.bookmarks.find((item) => item.id === id && item.is_deleted === 1) ?? null;
+            return bookmark ? ({ id: bookmark.id, folder_id: bookmark.folder_id } as T) : null;
+        }
+
+        if (normalized.startsWith('SELECT id FROM folders WHERE id = ? AND is_deleted = 0')) {
+            const id = Number(bindings[0]);
+            const folder = this.folders.find((item) => item.id === id && item.is_deleted === 0) ?? null;
+            return folder ? ({ id: folder.id } as T) : null;
+        }
+
+        if (normalized.startsWith('SELECT parent_id FROM folders WHERE id = ? AND is_deleted = 0')) {
+            const id = Number(bindings[0]);
+            const folder = this.folders.find((item) => item.id === id && item.is_deleted === 0) ?? null;
+            return folder ? ({ parent_id: folder.parent_id } as T) : null;
+        }
+
+        if (normalized.startsWith('SELECT folder_id FROM bookmarks WHERE id = ? AND is_deleted = 0')) {
+            const id = Number(bindings[0]);
+            const bookmark = this.bookmarks.find((item) => item.id === id && item.is_deleted === 0) ?? null;
+            return bookmark ? ({ folder_id: bookmark.folder_id } as T) : null;
+        }
+
         throw new Error(`Unsupported first() SQL: ${normalized}`);
     }
 
@@ -287,6 +311,12 @@ class MockD1Database {
 
         if (normalized.startsWith('DELETE FROM bookmarks WHERE is_deleted = 1')) {
             this.bookmarks = this.bookmarks.filter((item) => item.is_deleted !== 1);
+            return { success: true, meta: {} };
+        }
+
+        if (normalized.startsWith('DELETE FROM bookmarks WHERE is_deleted = 0 AND folder_id IN (SELECT id FROM folders WHERE is_deleted = 1)')) {
+            const trashedFolderIds = new Set(this.folders.filter((item) => item.is_deleted === 1).map((item) => item.id));
+            this.bookmarks = this.bookmarks.filter((item) => item.is_deleted !== 0 || item.folder_id === null || !trashedFolderIds.has(item.folder_id));
             return { success: true, meta: {} };
         }
 
@@ -600,6 +630,207 @@ describe('web-bookmarks app', () => {
         expect(db.bookmarks[0].is_deleted).toBe(0);
     });
 
+    it('rejects restoring a trashed bookmark when its parent folder is still in trash', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+
+        await app.fetch(new Request('https://example.com/api/folders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ name: 'root' }),
+        }), env);
+        const rootId = db.folders[0].id;
+
+        await app.fetch(new Request('https://example.com/api/bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ title: 'bookmark', url: 'https://example.org', folder_id: rootId }),
+        }), env);
+        const bookmarkId = db.bookmarks[0].id;
+
+        await app.fetch(new Request(`https://example.com/api/folders/${rootId}`, {
+            method: 'DELETE',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        const restoreResponse = await app.fetch(new Request(`https://example.com/api/restore/bookmarks/${bookmarkId}`, {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        expect(restoreResponse.status).toBe(409);
+        expect(await restoreResponse.json()).toMatchObject({
+            error: 'Parent folder is still in trash',
+        });
+        expect(db.bookmarks[0].is_deleted).toBe(1);
+    });
+
+    it('restores a root-level trashed bookmark successfully', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+
+        await app.fetch(new Request('https://example.com/api/bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ title: 'root-bookmark', url: 'https://example.org/root' }),
+        }), env);
+        const bookmarkId = db.bookmarks[0].id;
+
+        await app.fetch(new Request(`https://example.com/api/bookmarks/${bookmarkId}`, {
+            method: 'DELETE',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        const restoreResponse = await app.fetch(new Request(`https://example.com/api/restore/bookmarks/${bookmarkId}`, {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        expect(restoreResponse.status).toBe(200);
+        expect(db.bookmarks[0].is_deleted).toBe(0);
+        expect(db.bookmarks[0].folder_id).toBeNull();
+    });
+
+    it('restores a trashed bookmark after its parent folder is restored', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+
+        await app.fetch(new Request('https://example.com/api/folders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ name: 'root' }),
+        }), env);
+        const rootId = db.folders[0].id;
+
+        await app.fetch(new Request('https://example.com/api/bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ title: 'bookmark', url: 'https://example.org', folder_id: rootId }),
+        }), env);
+        const bookmarkId = db.bookmarks[0].id;
+
+        await app.fetch(new Request(`https://example.com/api/folders/${rootId}`, {
+            method: 'DELETE',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        const restoreFolderResponse = await app.fetch(new Request(`https://example.com/api/restore/folders/${rootId}`, {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+        expect(restoreFolderResponse.status).toBe(200);
+
+        const restoreBookmarkResponse = await app.fetch(new Request(`https://example.com/api/restore/bookmarks/${bookmarkId}`, {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        expect(restoreBookmarkResponse.status).toBe(200);
+        expect(db.folders[0].is_deleted).toBe(0);
+        expect(db.bookmarks[0].is_deleted).toBe(0);
+    });
+
+    it('rejects restoring a bookmark that is not in trash', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+
+        await app.fetch(new Request('https://example.com/api/bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ title: 'active-bookmark', url: 'https://example.org/active' }),
+        }), env);
+        const bookmarkId = db.bookmarks[0].id;
+
+        const restoreResponse = await app.fetch(new Request(`https://example.com/api/restore/bookmarks/${bookmarkId}`, {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        expect(restoreResponse.status).toBe(404);
+        expect(await restoreResponse.json()).toMatchObject({
+            error: 'Bookmark not found in trash',
+        });
+        expect(db.bookmarks[0].is_deleted).toBe(0);
+    });
+
+    it('rejects restoring a folder that is not in trash', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+
+        await app.fetch(new Request('https://example.com/api/folders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ name: 'active-folder' }),
+        }), env);
+        const folderId = db.folders[0].id;
+
+        const restoreResponse = await app.fetch(new Request(`https://example.com/api/restore/folders/${folderId}`, {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        expect(restoreResponse.status).toBe(404);
+        expect(await restoreResponse.json()).toMatchObject({
+            error: 'Folder not found in trash',
+        });
+        expect(db.folders[0].is_deleted).toBe(0);
+    });
+
     it('only returns CORS headers for configured extension origins', async () => {
         const allowedResponse = await app.fetch(new Request('https://example.com/api/data', {
             method: 'OPTIONS',
@@ -834,6 +1065,54 @@ describe('web-bookmarks app', () => {
         expect(db.bookmarks).toHaveLength(0);
     });
 
+    it('empty trash removes active bookmarks that still point to trashed folders', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+
+        await app.fetch(new Request('https://example.com/api/folders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ name: 'root' }),
+        }), env);
+        const rootId = db.folders[0].id;
+
+        await app.fetch(new Request('https://example.com/api/bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ title: 'bookmark', url: 'https://example.org', folder_id: rootId }),
+        }), env);
+
+        await app.fetch(new Request(`https://example.com/api/folders/${rootId}`, {
+            method: 'DELETE',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        db.bookmarks[0].is_deleted = 0;
+
+        const emptyResponse = await app.fetch(new Request('https://example.com/api/trash/empty', {
+            method: 'DELETE',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        expect(emptyResponse.status).toBe(200);
+        expect(db.folders).toHaveLength(0);
+        expect(db.bookmarks).toHaveLength(0);
+    });
+
     it('rate limiting returns 429 after configured threshold', async () => {
         env.RATE_LIMIT_MAX = '2';
         const cookie = await login(env);
@@ -854,6 +1133,98 @@ describe('web-bookmarks app', () => {
         expect(limitedResponse.status).toBe(429);
         expect(await limitedResponse.json()).toMatchObject({
             error: 'Too Many Requests',
+        });
+    });
+
+    it('rejects folder reorder across different parent folders', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+
+        await app.fetch(new Request('https://example.com/api/folders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ name: 'root-a' }),
+        }), env);
+        await app.fetch(new Request('https://example.com/api/folders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ name: 'root-b' }),
+        }), env);
+
+        const rootAId = db.folders[0].id;
+        const rootBId = db.folders[1].id;
+
+        const reorderResponse = await app.fetch(new Request('https://example.com/api/folders/reorder', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ orderedIds: [rootAId, rootBId] }),
+        }), env);
+
+        expect(reorderResponse.status).toBe(400);
+        expect(await reorderResponse.json()).toMatchObject({
+            error: 'Folder reorder items must belong to the same parent',
+        });
+    });
+
+    it('rejects bookmark reorder when request includes deleted bookmarks', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+
+        await app.fetch(new Request('https://example.com/api/bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ title: 'bookmark-a', url: 'https://example.org/a' }),
+        }), env);
+        await app.fetch(new Request('https://example.com/api/bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ title: 'bookmark-b', url: 'https://example.org/b' }),
+        }), env);
+
+        const activeId = db.bookmarks[0].id;
+        const deletedId = db.bookmarks[1].id;
+
+        await app.fetch(new Request(`https://example.com/api/bookmarks/${deletedId}`, {
+            method: 'DELETE',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        const reorderResponse = await app.fetch(new Request('https://example.com/api/bookmarks/reorder', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ orderedIds: [activeId, deletedId] }),
+        }), env);
+
+        expect(reorderResponse.status).toBe(400);
+        expect(await reorderResponse.json()).toMatchObject({
+            error: 'Bookmark reorder contains invalid or deleted items',
         });
     });
 

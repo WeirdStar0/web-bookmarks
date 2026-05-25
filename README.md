@@ -110,6 +110,7 @@ npx wrangler d1 create bookmarks-db
 # 运行 SQL 初始化表结构 (本地模式)
 npx wrangler d1 execute bookmarks-db --local --file=./schema.sql
 npx wrangler d1 execute bookmarks-db --local --file=./migrations/002_add_indexes.sql
+npx wrangler d1 execute bookmarks-db --local --file=./migrations/004_enforce_trash_consistency.sql
 ```
 
 ### 3. 环境变量配置
