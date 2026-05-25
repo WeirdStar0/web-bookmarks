@@ -143,9 +143,9 @@ handleSidebarClick(event) {
 },
 
 getFolderName(id) {
-    if (!id) return window.translations.modals.rootFolder;
+    if (!id) return window.translations?.modals?.rootFolder ?? 'Root';
     const folder = this.folders.find(f => f.id === id);
-    return folder ? folder.name : window.translations.modals.unknownFolder;
+    return folder ? folder.name : (window.translations?.modals?.unknownFolder ?? 'Unknown');
 },
 
 toggleSelector(id) {

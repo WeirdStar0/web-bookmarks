@@ -93,7 +93,7 @@ app.use('*', secureHeaders({
     crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-eval'"],
+        scriptSrc: ["'self'", "'unsafe-eval'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "https://www.google.com"],
         connectSrc: ["'self'"],
