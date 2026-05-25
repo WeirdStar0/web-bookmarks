@@ -1,5 +1,5 @@
 import { deleteCookie, setSignedCookie } from 'hono/cookie';
-import { getConfig, getSettings, hashPassword, hashPasswordV2, invalidateSettingsCache } from '../utils/common';
+import { getConfig, getSettings, hashPassword, hashPasswordV2 } from '../utils/common';
 import * as s from '../utils/schemas';
 import type { ApiApp } from './types';
 
@@ -45,7 +45,6 @@ export function registerAuthRoutes(app: ApiApp) {
                     const v2 = await hashPasswordV2(password);
                     const newDbValue = `v2:${v2.salt}:${v2.hash}`;
                     await c.env.DB.prepare('UPDATE settings SET value = ? WHERE key = ?').bind(newDbValue, 'password').run();
-                    invalidateSettingsCache();
 
                     const secret = c.get('sessionSecret');
                     const url = new URL(c.req.url);
@@ -88,7 +87,6 @@ export function registerAuthRoutes(app: ApiApp) {
             await c.env.DB.prepare('UPDATE settings SET value = ? WHERE key = ?').bind(newDbValue, 'password').run();
         }
 
-        invalidateSettingsCache();
         return c.json({ success: true });
     });
 }

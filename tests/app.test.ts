@@ -234,15 +234,15 @@ class MockD1Database {
             return { success: true, meta: { last_row_id: id } };
         }
 
-        if (normalized.startsWith('INSERT INTO bookmarks (title, url, folder_id) VALUES (?, ?, ?)')) {
+        if (normalized.startsWith('INSERT INTO bookmarks (title, url, description, folder_id) VALUES (?, ?, ?, ?)')) {
             const id = this.bookmarkId++;
             const now = new Date().toISOString();
             this.bookmarks.push({
                 id,
                 title: String(bindings[0]),
                 url: String(bindings[1]),
-                description: null,
-                folder_id: toNullableNumber(bindings[2]),
+                description: bindings[2] !== null && bindings[2] !== undefined ? String(bindings[2]) : null,
+                folder_id: toNullableNumber(bindings[3]),
                 sort_order: 0,
                 is_deleted: 0,
                 created_at: now,

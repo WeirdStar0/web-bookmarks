@@ -6,9 +6,9 @@ export function registerBookmarkRoutes(app: ApiApp) {
         const body = await c.req.json();
         const result = s.bookmarkSchema.safeParse(body);
         if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
-        const { title, url, folder_id } = result.data;
+        const { title, url, description, folder_id } = result.data;
 
-        await c.env.DB.prepare('INSERT INTO bookmarks (title, url, folder_id) VALUES (?, ?, ?)').bind(title, url, folder_id || null).run();
+        await c.env.DB.prepare('INSERT INTO bookmarks (title, url, description, folder_id) VALUES (?, ?, ?, ?)').bind(title, url, description ?? null, folder_id ?? null).run();
         return c.json({ success: true });
     });
 
@@ -51,18 +51,19 @@ export function registerBookmarkRoutes(app: ApiApp) {
 
         const bodyRes = s.bookmarkSchema.partial().safeParse(await c.req.json());
         if (!bodyRes.success) return c.json({ error: bodyRes.error.issues[0].message }, 400);
-        const { title, url, folder_id } = bodyRes.data;
+        const { title, url, description, folder_id } = bodyRes.data;
 
-        if (title && url && folder_id !== undefined) {
-            await c.env.DB.prepare('UPDATE bookmarks SET title = ?, url = ?, folder_id = ? WHERE id = ?').bind(title, url, folder_id, id).run();
-        } else if (title && url) {
-            await c.env.DB.prepare('UPDATE bookmarks SET title = ?, url = ? WHERE id = ?').bind(title, url, id).run();
-        } else if (title) {
-            await c.env.DB.prepare('UPDATE bookmarks SET title = ? WHERE id = ?').bind(title, id).run();
-        } else if (url) {
-            await c.env.DB.prepare('UPDATE bookmarks SET url = ? WHERE id = ?').bind(url, id).run();
-        } else if (folder_id !== undefined) {
-            await c.env.DB.prepare('UPDATE bookmarks SET folder_id = ? WHERE id = ?').bind(folder_id, id).run();
+        const setClauses: string[] = [];
+        const bindings: unknown[] = [];
+
+        if (title !== undefined) { setClauses.push('title = ?'); bindings.push(title); }
+        if (url !== undefined) { setClauses.push('url = ?'); bindings.push(url); }
+        if (description !== undefined) { setClauses.push('description = ?'); bindings.push(description); }
+        if (folder_id !== undefined) { setClauses.push('folder_id = ?'); bindings.push(folder_id); }
+
+        if (setClauses.length > 0) {
+            bindings.push(id);
+            await c.env.DB.prepare(`UPDATE bookmarks SET ${setClauses.join(', ')} WHERE id = ?`).bind(...bindings).run();
         }
         return c.json({ success: true });
     });

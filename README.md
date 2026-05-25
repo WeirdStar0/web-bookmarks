@@ -111,6 +111,7 @@ npx wrangler d1 create bookmarks-db
 npx wrangler d1 execute bookmarks-db --local --file=./schema.sql
 npx wrangler d1 execute bookmarks-db --local --file=./migrations/002_add_indexes.sql
 npx wrangler d1 execute bookmarks-db --local --file=./migrations/004_enforce_trash_consistency.sql
+npx wrangler d1 execute bookmarks-db --local --file=./migrations/005_add_bookmark_sort_index.sql
 ```
 
 ### 3. 环境变量配置

@@ -74,7 +74,3 @@ export async function getSettings(db: D1Database): Promise<Record<string, string
     });
     return settings;
 }
-
-export function invalidateSettingsCache() {
-    // No-op as cache is removed
-}
