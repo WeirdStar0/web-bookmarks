@@ -61,8 +61,8 @@ Click the **Deploy to Cloudflare Workers** button. It will:
 3. Automatically create and bind D1 database.
 
 **What happens after deployment:**
-*   **Zero Configuration**: Database, indexes, admin account, and `SECRET_KEY` are auto-initialized on first visit.
-*   **Ready to Use**: Access your Worker URL and start managing bookmarks.
+*   Database and indexes are initialized automatically on first visit.
+*   Set `INITIAL_ADMIN_PASSWORD` before the first production login; otherwise no default admin account is created.
 
 ---
 
@@ -83,9 +83,10 @@ Click the **Deploy to Cloudflare Workers** button. It will:
    npm run db:reset:remote
    ```
 
-3. **Set Secret and Deploy**
+3. **Set Secrets and Deploy**
    ```bash
    npx wrangler secret put SECRET_KEY
+   npx wrangler secret put INITIAL_ADMIN_PASSWORD
    npm run deploy
    ```
 
@@ -112,13 +113,17 @@ Create `.dev.vars`:
 ```bash
 openssl rand -base64 32
 ```
-Add to `.dev.vars`: `SECRET_KEY=your-random-key`
+Add to `.dev.vars`:
+```bash
+SECRET_KEY=your-random-key
+INITIAL_ADMIN_PASSWORD=your-initial-admin-password
+```
 
 4. **Start Development**
 ```bash
 npm run dev
 ```
-Visit `http://localhost:8787`. Default: `admin` / `123456`
+Visit `http://localhost:8787`. Local development falls back to `admin` / `123456` when `INITIAL_ADMIN_PASSWORD` is not set; production requires an explicit initial password.
 
 Frontend assets are generated locally. Do not edit generated files directly:
 - `src/templates/appAsset.ts` from `npm run build:app-asset`
@@ -184,7 +189,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```bash
 npm run db:reset:remote
 ```
-Passwords are stored as hashes, so writing plaintext into `settings.password` is no longer valid. After reset, the default admin credentials are `admin` / `123456`.
+Passwords are stored as hashes, so writing plaintext into `settings.password` is no longer valid. After a production reset, set `INITIAL_ADMIN_PASSWORD` again before logging in; local development can still fall back to `admin` / `123456`.
 
 ## 🔧 Configuration
 

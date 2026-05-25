@@ -401,7 +401,7 @@ function renderFolderSelect(lastFolderId) {
     if (lastFolderId) {
         hiddenInput.value = lastFolderId;
         const name = findFolderName(lastFolderId);
-        trigger.innerHTML = `<span class="truncate">${name}</span>`;
+        setTriggerText(trigger, name);
     }
 
     const buildTree = (parentId, parentEl) => {
@@ -454,7 +454,7 @@ function renderFolderSelect(lastFolderId) {
 
             rowDiv.onclick = (e) => {
                 hiddenInput.value = folder.id;
-                trigger.innerHTML = `<span class="truncate">${folder.name}</span>`;
+                setTriggerText(trigger, folder.name);
                 container.classList.add('hidden');
                 document.querySelectorAll('.folder-node').forEach(el => el.classList.remove('selected'));
                 rowDiv.classList.add('selected');
@@ -475,6 +475,14 @@ function escapeHtml(unsafe) {
         .replace(/'/g, '&#039;');
 }
 
+function setTriggerText(trigger, text) {
+    trigger.textContent = '';
+    const span = document.createElement('span');
+    span.className = 'truncate';
+    span.textContent = text;
+    trigger.appendChild(span);
+}
+
 function renderSearchResults(bookmarks) {
     searchResults.innerHTML = '';
     if (bookmarks.length === 0) {
@@ -482,11 +490,21 @@ function renderSearchResults(bookmarks) {
         return;
     }
     bookmarks.forEach(bookmark => {
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(bookmark.url);
+            if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
+                return;
+            }
+        } catch {
+            return;
+        }
+
         const div = document.createElement('div');
         div.className = 'p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer flex items-center space-x-2.5 transition-colors';
 
         // Use Google Favicon Service
-        const faviconUrl = `https://www.google.com/s2/favicons?domain=${escapeHtml(new URL(bookmark.url).hostname)}&sz=32`;
+        const faviconUrl = `https://www.google.com/s2/favicons?domain=${escapeHtml(parsedUrl.hostname)}&sz=32`;
 
         div.innerHTML = `
         <div class="flex-shrink-0 w-6 h-6 bg-gray-100 dark:bg-gray-800 rounded flex items-center justify-center overflow-hidden">

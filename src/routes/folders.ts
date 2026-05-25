@@ -13,6 +13,15 @@ export function registerFolderRoutes(app: ApiApp) {
         }
         const { name, parent_id } = result.data;
 
+        if (parent_id !== null && parent_id !== undefined) {
+            const parent = await c.env.DB.prepare('SELECT id FROM folders WHERE id = ? AND is_deleted = 0')
+                .bind(parent_id)
+                .first<{ id: number }>();
+            if (!parent) {
+                return c.json(err(ErrCode.NOT_FOUND, 'Parent folder not found'), 404);
+            }
+        }
+
         await c.env.DB.prepare('INSERT INTO folders (name, parent_id) VALUES (?, ?)').bind(name, parent_id || null).run();
         return c.json({ success: true });
     });
@@ -51,6 +60,11 @@ export function registerFolderRoutes(app: ApiApp) {
         if (!idRes.success) return c.json(err(ErrCode.INVALID_ID, 'Invalid ID'), 400);
         const id = idRes.data;
 
+        const existing = await c.env.DB.prepare('SELECT id FROM folders WHERE id = ? AND is_deleted = 0')
+            .bind(id)
+            .first<{ id: number }>();
+        if (!existing) return c.json(err(ErrCode.NOT_FOUND, 'Folder not found'), 404);
+
         const bodyRes = s.folderSchema.partial().safeParse(await c.req.json());
         if (!bodyRes.success) return c.json(err(ErrCode.VALIDATION, bodyRes.error.issues[0].message), 400);
         const { name, parent_id } = bodyRes.data;
@@ -60,6 +74,13 @@ export function registerFolderRoutes(app: ApiApp) {
         }
 
         if (parent_id) {
+            const parent = await c.env.DB.prepare('SELECT id FROM folders WHERE id = ? AND is_deleted = 0')
+                .bind(parent_id)
+                .first<{ id: number }>();
+            if (!parent) {
+                return c.json(err(ErrCode.NOT_FOUND, 'Parent folder not found'), 404);
+            }
+
             const { results } = await c.env.DB.prepare(`
                 WITH RECURSIVE descendants(id) AS (
                     SELECT id FROM folders WHERE parent_id = ?

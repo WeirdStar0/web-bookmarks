@@ -316,6 +316,31 @@ class MockD1Database {
             return { success: true, meta: {} };
         }
 
+        if (normalized.startsWith('UPDATE folders SET name = ?, parent_id = ? WHERE id = ?')) {
+            const folder = this.folders.find((item) => item.id === Number(bindings[2]));
+            if (folder) {
+                folder.name = String(bindings[0]);
+                folder.parent_id = toNullableNumber(bindings[1]);
+            }
+            return { success: true, meta: {} };
+        }
+
+        if (normalized.startsWith('UPDATE folders SET name = ? WHERE id = ?')) {
+            const folder = this.folders.find((item) => item.id === Number(bindings[1]));
+            if (folder) {
+                folder.name = String(bindings[0]);
+            }
+            return { success: true, meta: {} };
+        }
+
+        if (normalized.startsWith('UPDATE folders SET parent_id = ? WHERE id = ?')) {
+            const folder = this.folders.find((item) => item.id === Number(bindings[1]));
+            if (folder) {
+                folder.parent_id = toNullableNumber(bindings[0]);
+            }
+            return { success: true, meta: {} };
+        }
+
         if (normalized.startsWith('UPDATE bookmarks SET is_deleted = ? WHERE folder_id = ?')) {
             const isDeleted = Number(bindings[0]);
             const folderId = Number(bindings[1]);
@@ -347,6 +372,22 @@ class MockD1Database {
             const bookmark = this.bookmarks.find((item) => item.id === Number(bindings[1]));
             if (bookmark) {
                 bookmark.sort_order = Number(bindings[0]);
+            }
+            return { success: true, meta: {} };
+        }
+
+        if (normalized.startsWith('UPDATE bookmarks SET')) {
+            const id = Number(bindings[bindings.length - 1]);
+            const bookmark = this.bookmarks.find((item) => item.id === id);
+            if (bookmark) {
+                const setClause = normalized.slice('UPDATE bookmarks SET '.length, normalized.indexOf(' WHERE id = ?'));
+                const clauses = setClause.split(',').map((clause) => clause.trim());
+                clauses.forEach((clause, index) => {
+                    if (clause === 'title = ?') bookmark.title = String(bindings[index]);
+                    if (clause === 'url = ?') bookmark.url = String(bindings[index]);
+                    if (clause === 'description = ?') bookmark.description = bindings[index] === null ? null : String(bindings[index]);
+                    if (clause === 'folder_id = ?') bookmark.folder_id = toNullableNumber(bindings[index]);
+                });
             }
             return { success: true, meta: {} };
         }
@@ -436,6 +477,7 @@ function createEnv() {
         DB: new MockD1Database() as unknown as D1Database,
         RATE_LIMIT_KV: new MockKVNamespace() as unknown as KVNamespace,
         SECRET_KEY: 'test-secret',
+        INITIAL_ADMIN_PASSWORD: '123456',
         ALLOWED_EXTENSION_ORIGINS: 'chrome-extension://allowed-extension-id',
         SESSION_MAX_AGE: '3600',
         RATE_LIMIT_MAX: '100',
@@ -464,10 +506,12 @@ async function login(env: ReturnType<typeof createEnv>) {
     }), env);
 
     expect(response.status).toBe(200);
-    const cookie = response.headers.get('set-cookie');
-    expect(cookie).toBeTruthy();
-    return cookie as string;
-}
+        const cookie = response.headers.get('set-cookie');
+        expect(cookie).toBeTruthy();
+        const db = env.DB as unknown as MockD1Database;
+        expect(db.settings.get('password')?.startsWith('v2:')).toBe(true);
+        return cookie as string;
+    }
 
 describe('web-bookmarks app', () => {
     let env: ReturnType<typeof createEnv>;
@@ -910,8 +954,8 @@ describe('web-bookmarks app', () => {
         expect(blockedResponse.headers.get('access-control-allow-origin')).toBeNull();
     });
 
-    it('keeps extension requests working by default when no allowlist is configured', async () => {
-        const defaultCompatibleEnv = createEnvWithoutExtensionAllowlist();
+    it('rejects extension requests when no allowlist is configured', async () => {
+        const noAllowlistEnv = createEnvWithoutExtensionAllowlist();
 
         const corsResponse = await app.fetch(new Request('https://example.com/api/data', {
             method: 'OPTIONS',
@@ -919,8 +963,9 @@ describe('web-bookmarks app', () => {
                 Origin: 'chrome-extension://existing-extension-id',
                 'Access-Control-Request-Method': 'GET',
             },
-        }), defaultCompatibleEnv);
-        expect(corsResponse.headers.get('access-control-allow-origin')).toBe('chrome-extension://existing-extension-id');
+        }), noAllowlistEnv);
+        expect(corsResponse.status).toBe(403);
+        expect(corsResponse.headers.get('access-control-allow-origin')).toBeNull();
 
         const loginResponse = await app.fetch(new Request('https://example.com/api/login', {
             method: 'POST',
@@ -932,8 +977,8 @@ describe('web-bookmarks app', () => {
                 username: 'admin',
                 password: '123456',
             }),
-        }), defaultCompatibleEnv);
-        expect(loginResponse.status).toBe(200);
+        }), noAllowlistEnv);
+        expect(loginResponse.status).toBe(403);
     });
 
     it('enforces the allowlist once extension origins are explicitly configured', async () => {
@@ -949,6 +994,25 @@ describe('web-bookmarks app', () => {
         expect(blockedPreflightResponse.headers.get('access-control-allow-origin')).toBeNull();
     });
 
+    it('rejects credentialed api calls from other workers.dev origins', async () => {
+        const cookie = await login(env);
+
+        const response = await app.fetch(new Request('https://bookmarks.example.workers.dev/api/data', {
+            method: 'GET',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://attacker.workers.dev',
+            },
+        }), env);
+
+        expect(response.status).toBe(403);
+        expect(response.headers.get('access-control-allow-origin')).toBeNull();
+        expect(await response.json()).toMatchObject({
+            error: 'FORBIDDEN',
+            message: 'Origin not allowed',
+        });
+    });
+
     it('rejects protected api routes without a valid auth cookie', async () => {
         const response = await app.fetch(new Request('https://example.com/api/data', {
             method: 'GET',
@@ -962,6 +1026,127 @@ describe('web-bookmarks app', () => {
             error: 'UNAUTHORIZED',
             message: 'Unauthorized',
         });
+    });
+
+    it('requires an initial admin password in production when settings are empty', async () => {
+        const productionEnv = {
+            ...createEnv(),
+            INITIAL_ADMIN_PASSWORD: undefined,
+        };
+        resetInitState();
+
+        const response = await app.fetch(new Request('https://example.com/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({
+                username: 'admin',
+                password: '123456',
+            }),
+        }), productionEnv);
+
+        expect(response.status).toBe(500);
+        const db = productionEnv.DB as unknown as MockD1Database;
+        expect(db.settings.has('username')).toBe(false);
+        expect(db.settings.has('password')).toBe(false);
+    });
+
+    it('repairs partial admin settings when an initial admin password is configured', async () => {
+        const db = env.DB as unknown as MockD1Database;
+        db.settings.set('username', 'admin');
+
+        const response = await app.fetch(new Request('https://example.com/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({
+                username: 'admin',
+                password: '123456',
+            }),
+        }), env);
+
+        expect(response.status).toBe(200);
+        expect(db.settings.get('password')).toBeTruthy();
+    });
+
+    it('rejects non-http bookmark URLs', async () => {
+        const cookie = await login(env);
+
+        const createResponse = await app.fetch(new Request('https://example.com/api/bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ title: 'bad', url: 'javascript:alert(1)' }),
+        }), env);
+
+        expect(createResponse.status).toBe(400);
+
+        const dataUrlResponse = await app.fetch(new Request('https://example.com/api/bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ title: 'bad', url: 'data:text/html,hi' }),
+        }), env);
+
+        expect(dataUrlResponse.status).toBe(400);
+    });
+
+    it('rejects missing parent folders and missing update targets', async () => {
+        const cookie = await login(env);
+
+        const folderResponse = await app.fetch(new Request('https://example.com/api/folders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ name: 'child', parent_id: 999 }),
+        }), env);
+        expect(folderResponse.status).toBe(404);
+
+        const bookmarkResponse = await app.fetch(new Request('https://example.com/api/bookmarks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ title: 'bookmark', url: 'https://example.org', folder_id: 999 }),
+        }), env);
+        expect(bookmarkResponse.status).toBe(404);
+
+        const updateFolderResponse = await app.fetch(new Request('https://example.com/api/folders/999', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ name: 'missing' }),
+        }), env);
+        expect(updateFolderResponse.status).toBe(404);
+
+        const updateBookmarkResponse = await app.fetch(new Request('https://example.com/api/bookmarks/999', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ title: 'missing' }),
+        }), env);
+        expect(updateBookmarkResponse.status).toBe(404);
     });
 
     it('serves the external app asset for alpine initialization', async () => {

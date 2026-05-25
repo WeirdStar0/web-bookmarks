@@ -22,7 +22,7 @@ import { pt } from './locales/pt';
 import { it } from './locales/it';
 import { csrf } from 'hono/csrf';
 import type { HTTPException } from 'hono/http-exception';
-import { getConfig } from './utils/common';
+import { err, ErrCode, getConfig } from './utils/common';
 import type { TemplateTranslations } from './templates/types';
 import { appAssetSource } from './templates/appAsset';
 import { appCssAssetSource } from './templates/appCssAsset';
@@ -33,10 +33,6 @@ const locales: Record<string, Omit<TemplateTranslations, 'lang'>> = { en, zh, zh
 const app = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
 function isAllowedExtensionOrigin(origin: string, allowedOrigins: string[]) {
-    if (allowedOrigins.length === 0) {
-        return origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://');
-    }
-
     return allowedOrigins.includes(origin);
 }
 
@@ -49,45 +45,51 @@ function isLocalhostOrigin(origin: string): boolean {
     }
 }
 
+function isAllowedRequestOrigin(origin: string, requestOrigin: string, allowedExtensionOrigins: string[]): boolean {
+    if (origin === requestOrigin) return true;
+    if (isLocalhostOrigin(origin) && isLocalhostOrigin(requestOrigin)) return true;
+    if (
+        (origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://')) &&
+        isAllowedExtensionOrigin(origin, allowedExtensionOrigins)
+    ) {
+        return true;
+    }
+    return false;
+}
+
 app.use('*', logger());
 app.use('*', csrf({
     origin: (origin, c) => {
         const config = getConfig(c.env);
         const requestOrigin = new URL(c.req.url).origin;
-        // Allow extensions and same domain
-        if (
-            (origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://')) &&
-            isAllowedExtensionOrigin(origin, config.allowedExtensionOrigins)
-        ) {
-            return true;
-        }
-        if (origin === requestOrigin) return true;
-        // Dev
-        if (isLocalhostOrigin(origin)) return true;
-        return false;
+        return isAllowedRequestOrigin(origin, requestOrigin, config.allowedExtensionOrigins);
     }
 }));
 app.use('/api/*', cors({
     origin: (origin, c) => {
         const config = getConfig(c.env);
-        // Allow Localhost (Dev)
-        if (isLocalhostOrigin(origin)) return origin;
-        // Allow Web App (Prod) - Update with your actual domain
-        if (origin.endsWith('.workers.dev') || origin.endsWith('.pages.dev')) return origin;
-        // Allow configured extensions only
-        if (
-            (origin.startsWith('chrome-extension://') || origin.startsWith('moz-extension://')) &&
-            isAllowedExtensionOrigin(origin, config.allowedExtensionOrigins)
-        ) {
-            return origin;
-        }
-        // Block others
-        return undefined;
+        const requestOrigin = new URL(c.req.url).origin;
+        return isAllowedRequestOrigin(origin, requestOrigin, config.allowedExtensionOrigins) ? origin : undefined;
     },
     credentials: true,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization'],
 }));
+app.use('/api/*', async (c, next) => {
+    const origin = c.req.header('Origin');
+    if (!origin) {
+        await next();
+        return;
+    }
+
+    const config = getConfig(c.env);
+    const requestOrigin = new URL(c.req.url).origin;
+    if (!isAllowedRequestOrigin(origin, requestOrigin, config.allowedExtensionOrigins)) {
+        return c.json(err(ErrCode.FORBIDDEN, 'Origin not allowed'), 403);
+    }
+
+    await next();
+});
 app.use('*', secureHeaders({
     crossOriginResourcePolicy: false,
     crossOriginEmbedderPolicy: false,

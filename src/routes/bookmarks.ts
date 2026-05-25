@@ -9,6 +9,15 @@ export function registerBookmarkRoutes(app: ApiApp) {
         if (!result.success) return c.json(err(ErrCode.VALIDATION, result.error.issues[0].message), 400);
         const { title, url, description, folder_id } = result.data;
 
+        if (folder_id !== null && folder_id !== undefined) {
+            const parent = await c.env.DB.prepare('SELECT id FROM folders WHERE id = ? AND is_deleted = 0')
+                .bind(folder_id)
+                .first<{ id: number }>();
+            if (!parent) {
+                return c.json(err(ErrCode.NOT_FOUND, 'Folder not found'), 404);
+            }
+        }
+
         await c.env.DB.prepare('INSERT INTO bookmarks (title, url, description, folder_id) VALUES (?, ?, ?, ?)').bind(title, url, description ?? null, folder_id ?? null).run();
         return c.json({ success: true });
     });
@@ -50,9 +59,23 @@ export function registerBookmarkRoutes(app: ApiApp) {
         if (!idRes.success) return c.json(err(ErrCode.INVALID_ID, 'Invalid ID'), 400);
         const id = idRes.data;
 
+        const existing = await c.env.DB.prepare('SELECT id FROM bookmarks WHERE id = ? AND is_deleted = 0')
+            .bind(id)
+            .first<{ id: number }>();
+        if (!existing) return c.json(err(ErrCode.NOT_FOUND, 'Bookmark not found'), 404);
+
         const bodyRes = s.bookmarkSchema.partial().safeParse(await c.req.json());
         if (!bodyRes.success) return c.json(err(ErrCode.VALIDATION, bodyRes.error.issues[0].message), 400);
         const { title, url, description, folder_id } = bodyRes.data;
+
+        if (folder_id !== null && folder_id !== undefined) {
+            const parent = await c.env.DB.prepare('SELECT id FROM folders WHERE id = ? AND is_deleted = 0')
+                .bind(folder_id)
+                .first<{ id: number }>();
+            if (!parent) {
+                return c.json(err(ErrCode.NOT_FOUND, 'Folder not found'), 404);
+            }
+        }
 
         const setClauses: string[] = [];
         const bindings: unknown[] = [];

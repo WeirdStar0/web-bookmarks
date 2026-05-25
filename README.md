@@ -63,8 +63,8 @@
 3. 自动创建并绑定 D1 数据库。
 
 **部署后的结果：**
-*   **零配置使用**：数据库、索引、管理员账号以及加密密钥 (`SECRET_KEY`) 均会在您首次访问页面时全自动初始化。
-*   **即开即用**：部署完成后，直接访问您的 Worker URL 即可开始管理书签。
+*   数据库和索引会在首次访问时自动初始化。
+*   首次生产登录前必须设置 `INITIAL_ADMIN_PASSWORD`，否则不会创建默认管理员账号。
 
 ---
 
@@ -85,9 +85,10 @@
    npm run db:reset:remote
    ```
 
-3. **设置密钥并部署**
+3. **设置密钥、初始管理员密码并部署**
    ```bash
    npx wrangler secret put SECRET_KEY
+   npx wrangler secret put INITIAL_ADMIN_PASSWORD
    npm run deploy
    ```
 
@@ -120,13 +121,17 @@ npx wrangler d1 execute bookmarks-db --local --file=./migrations/005_add_bookmar
 # 生成生成的随机密钥
 openssl rand -base64 32
 ```
-在 `.dev.vars` 中填入：`SECRET_KEY=你的随机密钥`
+在 `.dev.vars` 中填入：
+```bash
+SECRET_KEY=你的随机密钥
+INITIAL_ADMIN_PASSWORD=你的初始管理员密码
+```
 
 ### 4. 启动开发服务器
 ```bash
 npm run dev
 ```
-访问 `http://localhost:8787`。默认账号：`admin` / 密码：`123456`
+访问 `http://localhost:8787`。本地开发未设置 `INITIAL_ADMIN_PASSWORD` 时默认账号为 `admin` / 密码 `123456`；生产环境必须显式设置初始密码。
 
 前端资源由本地构建链自动生成，不要直接手改生成产物：
 - `src/templates/appAsset.ts` 由 `npm run build:app-asset` 生成
@@ -210,7 +215,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```bash
 npm run db:reset:remote
 ```
-重置后默认账号会恢复为 `admin` / `123456`。
+重置后生产环境需要通过 `INITIAL_ADMIN_PASSWORD` 重新初始化管理员密码；本地开发仍可使用 `admin` / `123456`。
 
 ### 4. 速率限制不生效？
 - 确保已创建 KV 命名空间：`npx wrangler kv:namespace create RATE_LIMIT_KV`
@@ -232,6 +237,7 @@ npm run db:reset:remote
 ```
 # .dev.vars
 SECRET_KEY=your-secret-key
+INITIAL_ADMIN_PASSWORD=your-initial-admin-password
 ALLOWED_EXTENSION_ORIGINS=chrome-extension://your-extension-id
 ```
 
@@ -308,7 +314,7 @@ ALLOWED_EXTENSION_ORIGINS=chrome-extension://your-extension-id
 
 ## 🔒 安全建议
 
-1. **修改默认密码**: 部署后立即登录并修改默认的用户名和密码（默认密码为 `123456`）
+1. **修改初始密码**: 生产环境使用 `INITIAL_ADMIN_PASSWORD` 首次登录后，立即在设置中改成长期密码
 2. **使用 HTTPS**: Cloudflare Workers 默认提供 HTTPS
 3. **定期备份**: 定期导出书签数据作为备份
 4. **API Token 安全**: 不要将 Cloudflare API Token 提交到代码库

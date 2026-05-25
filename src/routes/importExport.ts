@@ -1,4 +1,5 @@
 import type { ApiApp } from './types';
+import { bookmarkSchema, folderSchema } from '../utils/schemas';
 
 type FolderRow = {
     id: number;
@@ -126,6 +127,12 @@ export function registerImportExportRoutes(app: ApiApp) {
                 await flushBookmarks();
                 const folderName = stripTags(match[2]);
                 if (!folderName) continue;
+                const folderResult = folderSchema.shape.name.safeParse(folderName);
+                if (!folderResult.success) {
+                    skippedFolders++;
+                    lastFolderId = stack[stack.length - 1];
+                    continue;
+                }
 
                 const parentId = stack[stack.length - 1];
                 const existing = await c.env.DB.prepare('SELECT id FROM folders WHERE name = ? AND parent_id IS ?')
@@ -143,7 +150,16 @@ export function registerImportExportRoutes(app: ApiApp) {
                 const url = match[3];
                 const title = stripTags(match[4] || url) || url;
                 const parentId = stack[stack.length - 1];
-                bookmarkBatch.push({ title, url, folderId: parentId });
+                const bookmarkResult = bookmarkSchema.safeParse({ title, url, folder_id: parentId });
+                if (!bookmarkResult.success) {
+                    skippedBookmarks++;
+                    continue;
+                }
+                bookmarkBatch.push({
+                    title: bookmarkResult.data.title,
+                    url: bookmarkResult.data.url,
+                    folderId: parentId,
+                });
                 if (bookmarkBatch.length >= BATCH_SIZE) await flushBookmarks();
             }
         }

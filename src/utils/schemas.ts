@@ -1,5 +1,16 @@
 import { z } from 'zod';
 
+const httpUrlSchema = z.string().url().max(2048).refine((value) => {
+    try {
+        const parsed = new URL(value);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+    } catch {
+        return false;
+    }
+}, {
+    message: 'Only HTTP and HTTPS URLs are supported',
+});
+
 export const loginSchema = z.object({
     username: z.string().min(3).max(100).regex(/^[a-zA-Z0-9_-]+$/),
     password: z.string().min(6).max(100),
@@ -19,7 +30,7 @@ export const folderSchema = z.object({
 
 export const bookmarkSchema = z.object({
     title: z.string().min(1).max(500),
-    url: z.string().url().max(2048),
+    url: httpUrlSchema,
     description: z.string().max(1000).nullable().optional(),
     folder_id: z.number().int().positive().nullable().optional(),
 });
