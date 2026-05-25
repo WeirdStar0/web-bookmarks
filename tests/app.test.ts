@@ -285,6 +285,14 @@ class MockD1Database {
             return { success: true, meta: {} };
         }
 
+        if (normalized.startsWith('UPDATE folders SET sort_order = ? WHERE id = ?')) {
+            const folder = this.folders.find((item) => item.id === Number(bindings[1]));
+            if (folder) {
+                folder.sort_order = Number(bindings[0]);
+            }
+            return { success: true, meta: {} };
+        }
+
         if (normalized.startsWith('UPDATE bookmarks SET is_deleted = ? WHERE folder_id = ?')) {
             const isDeleted = Number(bindings[0]);
             const folderId = Number(bindings[1]);
@@ -296,10 +304,26 @@ class MockD1Database {
             return { success: true, meta: {} };
         }
 
+        if (normalized.startsWith('UPDATE bookmarks SET is_deleted = 1 WHERE id = ?')) {
+            const bookmark = this.bookmarks.find((item) => item.id === Number(bindings[0]));
+            if (bookmark) {
+                bookmark.is_deleted = 1;
+            }
+            return { success: true, meta: {} };
+        }
+
         if (normalized.startsWith('UPDATE bookmarks SET is_deleted = 0 WHERE id = ?')) {
             const bookmark = this.bookmarks.find((item) => item.id === Number(bindings[0]));
             if (bookmark) {
                 bookmark.is_deleted = 0;
+            }
+            return { success: true, meta: {} };
+        }
+
+        if (normalized.startsWith('UPDATE bookmarks SET sort_order = ? WHERE id = ?')) {
+            const bookmark = this.bookmarks.find((item) => item.id === Number(bindings[1]));
+            if (bookmark) {
+                bookmark.sort_order = Number(bindings[0]);
             }
             return { success: true, meta: {} };
         }
@@ -715,7 +739,7 @@ describe('web-bookmarks app', () => {
         expect(db.bookmarks[0].folder_id).toBeNull();
     });
 
-    it('restores a trashed bookmark after its parent folder is restored', async () => {
+    it('returns not found when restoring a bookmark already restored with its parent folder', async () => {
         const cookie = await login(env);
         const db = env.DB as unknown as MockD1Database;
 
@@ -758,6 +782,8 @@ describe('web-bookmarks app', () => {
         }), env);
         expect(restoreFolderResponse.status).toBe(200);
 
+        expect(db.bookmarks[0].is_deleted).toBe(0);
+
         const restoreBookmarkResponse = await app.fetch(new Request(`https://example.com/api/restore/bookmarks/${bookmarkId}`, {
             method: 'POST',
             headers: {
@@ -766,7 +792,10 @@ describe('web-bookmarks app', () => {
             },
         }), env);
 
-        expect(restoreBookmarkResponse.status).toBe(200);
+        expect(restoreBookmarkResponse.status).toBe(404);
+        expect(await restoreBookmarkResponse.json()).toMatchObject({
+            error: 'Bookmark not found in trash',
+        });
         expect(db.folders[0].is_deleted).toBe(0);
         expect(db.bookmarks[0].is_deleted).toBe(0);
     });
@@ -1162,6 +1191,27 @@ describe('web-bookmarks app', () => {
         const rootAId = db.folders[0].id;
         const rootBId = db.folders[1].id;
 
+        await app.fetch(new Request('https://example.com/api/folders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ name: 'child-a', parent_id: rootAId }),
+        }), env);
+        await app.fetch(new Request('https://example.com/api/folders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: JSON.stringify({ name: 'child-b', parent_id: rootBId }),
+        }), env);
+        const childAId = db.folders[2].id;
+        const childBId = db.folders[3].id;
+
         const reorderResponse = await app.fetch(new Request('https://example.com/api/folders/reorder', {
             method: 'PUT',
             headers: {
@@ -1169,7 +1219,7 @@ describe('web-bookmarks app', () => {
                 Cookie: cookie,
                 Origin: 'https://example.com',
             },
-            body: JSON.stringify({ orderedIds: [rootAId, rootBId] }),
+            body: JSON.stringify({ orderedIds: [childAId, childBId] }),
         }), env);
 
         expect(reorderResponse.status).toBe(400);
