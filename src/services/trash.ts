@@ -1,23 +1,37 @@
 import type { D1Database } from '@cloudflare/workers-types';
 
 async function getFolderSubtreeIds(db: D1Database, folderId: number, deletedState?: 0 | 1) {
-    const conditions = deletedState === undefined ? '' : ' AND f.is_deleted = ?';
-    const rootConditions = deletedState === undefined ? '' : ' AND is_deleted = ?';
-    const bindings = deletedState === undefined
-        ? [folderId]
-        : [folderId, deletedState, deletedState];
+    let sql: string;
+    let bindings: unknown[];
 
-    const { results } = await db.prepare(`
-        WITH RECURSIVE sub(id) AS (
-            SELECT id FROM folders WHERE id = ?${rootConditions}
-            UNION ALL
-            SELECT f.id
-            FROM folders f
-            JOIN sub ON f.parent_id = sub.id
-            WHERE 1 = 1${conditions}
-        )
-        SELECT id FROM sub
-    `).bind(...bindings).all<{ id: number }>();
+    if (deletedState === undefined) {
+        sql = `
+            WITH RECURSIVE sub(id) AS (
+                SELECT id FROM folders WHERE id = ?
+                UNION ALL
+                SELECT f.id
+                FROM folders f
+                JOIN sub ON f.parent_id = sub.id
+            )
+            SELECT id FROM sub
+        `;
+        bindings = [folderId];
+    } else {
+        sql = `
+            WITH RECURSIVE sub(id) AS (
+                SELECT id FROM folders WHERE id = ? AND is_deleted = ?
+                UNION ALL
+                SELECT f.id
+                FROM folders f
+                JOIN sub ON f.parent_id = sub.id
+                WHERE f.is_deleted = ?
+            )
+            SELECT id FROM sub
+        `;
+        bindings = [folderId, deletedState, deletedState];
+    }
+
+    const { results } = await db.prepare(sql).bind(...bindings).all<{ id: number }>();
 
     return results.map((row) => row.id);
 }

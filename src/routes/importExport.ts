@@ -55,9 +55,12 @@ export function registerImportExportRoutes(app: ApiApp) {
             return c.json({ bookmarks: [] });
         }
 
+        // Escape LIKE wildcards so % and _ are treated as literal characters
+        const escaped = query.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+
         const { results: bookmarks } = await c.env.DB.prepare(
-            'SELECT * FROM bookmarks WHERE is_deleted = 0 AND (title LIKE ? OR url LIKE ?) ORDER BY sort_order ASC, created_at DESC LIMIT 50',
-        ).bind(`%${query}%`, `%${query}%`).all();
+            "SELECT * FROM bookmarks WHERE is_deleted = 0 AND (title LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\') ORDER BY sort_order ASC, created_at DESC LIMIT 50",
+        ).bind(`%${escaped}%`, `%${escaped}%`).all();
 
         return c.json({ bookmarks });
     });
@@ -89,6 +92,10 @@ export function registerImportExportRoutes(app: ApiApp) {
         let lastFolderId: number | null = null;
         const bookmarkBatch: ImportBookmark[] = [];
         const BATCH_SIZE = 50;
+        let importedFolders = 0;
+        let skippedFolders = 0;
+        let importedBookmarks = 0;
+        let skippedBookmarks = 0;
 
         const flushBookmarks = async () => {
             if (bookmarkBatch.length === 0) return;
@@ -96,7 +103,14 @@ export function registerImportExportRoutes(app: ApiApp) {
                 return c.env.DB.prepare('INSERT INTO bookmarks (title, url, folder_id) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ?)')
                     .bind(bookmark.title, bookmark.url, bookmark.folderId, bookmark.url, bookmark.folderId);
             });
-            await c.env.DB.batch(stmts);
+            const results = await c.env.DB.batch(stmts);
+            for (const r of results) {
+                if ((r.meta as { changes?: number }).changes) {
+                    importedBookmarks++;
+                } else {
+                    skippedBookmarks++;
+                }
+            }
             bookmarkBatch.length = 0;
         };
 
@@ -119,9 +133,11 @@ export function registerImportExportRoutes(app: ApiApp) {
                     .first<{ id: number }>();
                 if (existing) {
                     lastFolderId = existing.id;
+                    skippedFolders++;
                 } else {
                     const { meta } = await c.env.DB.prepare('INSERT INTO folders (name, parent_id) VALUES (?, ?)').bind(folderName, parentId).run();
                     lastFolderId = meta.last_row_id as number;
+                    importedFolders++;
                 }
             } else if (match[3]) {
                 const url = match[3];
@@ -132,6 +148,10 @@ export function registerImportExportRoutes(app: ApiApp) {
             }
         }
         await flushBookmarks();
-        return c.json({ success: true });
+        return c.json({
+            success: true,
+            imported: { folders: importedFolders, bookmarks: importedBookmarks },
+            skipped: { folders: skippedFolders, bookmarks: skippedBookmarks },
+        });
     });
 }

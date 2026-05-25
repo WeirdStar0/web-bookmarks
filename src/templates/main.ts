@@ -273,7 +273,8 @@ export const main = (t: TemplateTranslations) => `
                                      }">
                                     <a :href="currentView === 'home' && !isSorting ? bookmark.url : '#'" :target="currentView === 'home' && !isSorting ? '_blank' : ''" class="flex items-start space-x-3" :class="isSorting ? 'cursor-default' : ''">
                                         <div class="flex-shrink-0 w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 font-bold text-lg uppercase pointer-events-none">
-                                            <img :src="'https://www.google.com/s2/favicons?sz=64&domain=' + bookmark.url" class="w-6 h-6" @error="$el.style.display='none'" />
+                                            <!-- Privacy note: fetches favicon from Google's service, which receives the bookmark domain. -->
+                                        <img :src="'https://www.google.com/s2/favicons?sz=64&domain=' + bookmark.url" class="w-6 h-6" @error="$el.style.display='none'" />
                                             <span x-show="!$el.previousElementSibling || $el.previousElementSibling.style.display === 'none'" x-text="bookmark.title.charAt(0)"></span>
                                         </div>
                                         <div class="flex-1 min-w-0 pr-16 pointer-events-none">

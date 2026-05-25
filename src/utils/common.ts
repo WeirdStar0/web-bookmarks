@@ -74,3 +74,26 @@ export async function getSettings(db: D1Database): Promise<Record<string, string
     });
     return settings;
 }
+
+// ---- Error response helpers ----
+
+/** 统一的错误响应格式：{ error: 错误代码, message: 人类可读信息 } */
+export function err(code: string, message: string) {
+    return { error: code, message };
+}
+
+/** 错误代码常量，避免散落 magic string */
+export const ErrCode = {
+    UNAUTHORIZED: 'UNAUTHORIZED',
+    VALIDATION: 'VALIDATION_ERROR',
+    NOT_FOUND: 'NOT_FOUND',
+    INVALID_ID: 'INVALID_ID',
+    INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+    REORDER_INVALID: 'REORDER_INVALID',
+    REORDER_CROSS_SCOPE: 'REORDER_CROSS_SCOPE',
+    SELF_REFERENCE: 'SELF_REFERENCE',
+    CIRCULAR_REF: 'CIRCULAR_REF',
+    PARENT_IN_TRASH: 'PARENT_IN_TRASH',
+    RATE_LIMITED: 'RATE_LIMITED',
+    SERVER_ERROR: 'SERVER_ERROR',
+} as const;

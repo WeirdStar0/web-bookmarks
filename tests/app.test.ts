@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { D1Database, KVNamespace } from '@cloudflare/workers-types';
 import app from '../src/index';
+import { resetInitState } from '../src/middleware/init';
 import { appAssetSource } from '../src/templates/appAsset';
 import { appCssAssetSource } from '../src/templates/appCssAsset';
 import { vendorAssetSource } from '../src/templates/vendorAsset';
@@ -103,6 +104,12 @@ class MockD1Database {
             return bookmark ? ({ id: bookmark.id } as T) : null;
         }
 
+        if (normalized.startsWith('SELECT id FROM bookmarks WHERE id = ? AND is_deleted = 0')) {
+            const id = Number(bindings[0]);
+            const bookmark = this.bookmarks.find((item) => item.id === id && item.is_deleted === 0) ?? null;
+            return bookmark ? ({ id: bookmark.id } as T) : null;
+        }
+
         if (normalized.startsWith('SELECT id, folder_id FROM bookmarks WHERE id = ? AND is_deleted = 1')) {
             const id = Number(bindings[0]);
             const bookmark = this.bookmarks.find((item) => item.id === id && item.is_deleted === 1) ?? null;
@@ -174,6 +181,22 @@ class MockD1Database {
         if (normalized.startsWith('SELECT * FROM folders WHERE is_deleted = 0')) {
             return {
                 results: this.folders.filter((item) => item.is_deleted === 0) as T[],
+            };
+        }
+
+        if (normalized.includes('LIKE ? ESCAPE') && normalized.includes('title LIKE ? ESCAPE')) {
+            // Extract the search term from the LIKE pattern, unescaping \% and \_
+            const likePattern = String(bindings[0]);
+            const term = likePattern.slice(1, -1) // strip leading/trailing %
+                .replace(/\\%/g, '%')
+                .replace(/\\_/g, '_')
+                .replace(/\\\\/g, '\\');
+            return {
+                results: this.bookmarks
+                    .filter((item) => item.is_deleted === 0
+                        && (item.title.includes(term) || item.url.includes(term)))
+                    .sort((a, b) => (a.sort_order - b.sort_order) || b.created_at.localeCompare(a.created_at))
+                    .slice(0, 50) as T[],
             };
         }
 
@@ -271,10 +294,10 @@ class MockD1Database {
                     created_at: now,
                     updated_at: now,
                 });
-                return { success: true, meta: { last_row_id: id } };
+                return { success: true, meta: { last_row_id: id, changes: 1 } };
             }
 
-            return { success: true, meta: {} };
+            return { success: true, meta: { changes: 0 } };
         }
 
         if (normalized.startsWith('UPDATE folders SET is_deleted = ? WHERE id = ?')) {
@@ -451,6 +474,7 @@ describe('web-bookmarks app', () => {
 
     beforeEach(() => {
         env = createEnv();
+        resetInitState();
     });
 
     it('soft delete and restore keep folder subtree and bookmarks consistent', async () => {
@@ -615,7 +639,8 @@ describe('web-bookmarks app', () => {
 
         expect(permanentDeleteResponse.status).toBe(404);
         expect(await permanentDeleteResponse.json()).toMatchObject({
-            error: 'Folder not found in trash',
+            error: 'NOT_FOUND',
+            message: 'Folder not found in trash',
         });
         expect(db.folders).toHaveLength(2);
         expect(db.bookmarks).toHaveLength(1);
@@ -648,7 +673,8 @@ describe('web-bookmarks app', () => {
 
         expect(permanentDeleteResponse.status).toBe(404);
         expect(await permanentDeleteResponse.json()).toMatchObject({
-            error: 'Bookmark not found in trash',
+            error: 'NOT_FOUND',
+            message: 'Bookmark not found in trash',
         });
         expect(db.bookmarks).toHaveLength(1);
         expect(db.bookmarks[0].is_deleted).toBe(0);
@@ -698,7 +724,8 @@ describe('web-bookmarks app', () => {
 
         expect(restoreResponse.status).toBe(409);
         expect(await restoreResponse.json()).toMatchObject({
-            error: 'Parent folder is still in trash',
+            error: 'PARENT_IN_TRASH',
+            message: 'Parent folder is still in trash',
         });
         expect(db.bookmarks[0].is_deleted).toBe(1);
     });
@@ -794,7 +821,8 @@ describe('web-bookmarks app', () => {
 
         expect(restoreBookmarkResponse.status).toBe(404);
         expect(await restoreBookmarkResponse.json()).toMatchObject({
-            error: 'Bookmark not found in trash',
+            error: 'NOT_FOUND',
+            message: 'Bookmark not found in trash',
         });
         expect(db.folders[0].is_deleted).toBe(0);
         expect(db.bookmarks[0].is_deleted).toBe(0);
@@ -825,7 +853,8 @@ describe('web-bookmarks app', () => {
 
         expect(restoreResponse.status).toBe(404);
         expect(await restoreResponse.json()).toMatchObject({
-            error: 'Bookmark not found in trash',
+            error: 'NOT_FOUND',
+            message: 'Bookmark not found in trash',
         });
         expect(db.bookmarks[0].is_deleted).toBe(0);
     });
@@ -855,7 +884,8 @@ describe('web-bookmarks app', () => {
 
         expect(restoreResponse.status).toBe(404);
         expect(await restoreResponse.json()).toMatchObject({
-            error: 'Folder not found in trash',
+            error: 'NOT_FOUND',
+            message: 'Folder not found in trash',
         });
         expect(db.folders[0].is_deleted).toBe(0);
     });
@@ -929,7 +959,8 @@ describe('web-bookmarks app', () => {
 
         expect(response.status).toBe(401);
         expect(await response.json()).toMatchObject({
-            error: 'Unauthorized',
+            error: 'UNAUTHORIZED',
+            message: 'Unauthorized',
         });
     });
 
@@ -1026,6 +1057,11 @@ describe('web-bookmarks app', () => {
         }), env);
 
         expect(importResponse.status).toBe(200);
+        expect(await importResponse.json()).toMatchObject({
+            success: true,
+            imported: { folders: 1, bookmarks: 1 },
+            skipped: { folders: 0, bookmarks: 1 },
+        });
 
         const db = env.DB as unknown as MockD1Database;
         expect(db.folders).toHaveLength(1);
@@ -1161,7 +1197,8 @@ describe('web-bookmarks app', () => {
         const limitedResponse = await request();
         expect(limitedResponse.status).toBe(429);
         expect(await limitedResponse.json()).toMatchObject({
-            error: 'Too Many Requests',
+            error: 'RATE_LIMITED',
+            message: '服务器繁忙，请稍后再试',
         });
     });
 
@@ -1224,7 +1261,8 @@ describe('web-bookmarks app', () => {
 
         expect(reorderResponse.status).toBe(400);
         expect(await reorderResponse.json()).toMatchObject({
-            error: 'Folder reorder items must belong to the same parent',
+            error: 'REORDER_CROSS_SCOPE',
+            message: 'Folder reorder items must belong to the same parent',
         });
     });
 
@@ -1274,7 +1312,8 @@ describe('web-bookmarks app', () => {
 
         expect(reorderResponse.status).toBe(400);
         expect(await reorderResponse.json()).toMatchObject({
-            error: 'Bookmark reorder contains invalid or deleted items',
+            error: 'REORDER_INVALID',
+            message: 'Bookmark reorder contains invalid or deleted items',
         });
     });
 
@@ -1297,5 +1336,61 @@ describe('web-bookmarks app', () => {
 
         expect(response.status).toBe(200);
         expect(db.settings.get('password')).not.toBe('5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5');
+    });
+
+    it('search handles SQL wildcard characters as literal text', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+
+        db.bookmarks.push({
+            id: 1,
+            title: 'test%_pattern',
+            url: 'https://example.org/wildcard',
+            description: null,
+            folder_id: null,
+            sort_order: 0,
+            is_deleted: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        });
+        db.bookmarks.push({
+            id: 2,
+            title: 'normal bookmark',
+            url: 'https://example.org/normal',
+            description: null,
+            folder_id: null,
+            sort_order: 1,
+            is_deleted: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        });
+
+        // Search for literal '%' — should match only the bookmark containing '%'
+        const response = await app.fetch(new Request('https://example.com/api/search?q=' + encodeURIComponent('%'), {
+            method: 'GET',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        expect(response.status).toBe(200);
+        const data = await response.json() as { bookmarks: BookmarkRow[] };
+        expect(data.bookmarks).toHaveLength(1);
+        expect(data.bookmarks[0].title).toBe('test%_pattern');
+
+        // Search for literal '_' — should match only the bookmark containing '_'
+        const response2 = await app.fetch(new Request('https://example.com/api/search?q=' + encodeURIComponent('_'), {
+            method: 'GET',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        expect(response2.status).toBe(200);
+        const data2 = await response2.json() as { bookmarks: BookmarkRow[] };
+        expect(data2.bookmarks).toHaveLength(1);
+        expect(data2.bookmarks[0].title).toBe('test%_pattern');
     });
 });

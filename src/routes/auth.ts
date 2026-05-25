@@ -1,5 +1,5 @@
 import { deleteCookie, setSignedCookie } from 'hono/cookie';
-import { getConfig, getSettings, hashPassword, hashPasswordV2 } from '../utils/common';
+import { getConfig, getSettings, hashPassword, hashPasswordV2, err, ErrCode } from '../utils/common';
 import * as s from '../utils/schemas';
 import type { ApiApp } from './types';
 
@@ -10,7 +10,7 @@ export function registerAuthRoutes(app: ApiApp) {
         const result = s.loginSchema.safeParse(body);
 
         if (!result.success) {
-            return c.json({ error: result.error.issues[0].message }, 400);
+            return c.json(err(ErrCode.VALIDATION, result.error.issues[0].message), 400);
         }
         const { username, password } = result.data;
 
@@ -60,7 +60,7 @@ export function registerAuthRoutes(app: ApiApp) {
                 }
             }
         }
-        return c.json({ error: 'Invalid credentials' }, 401);
+        return c.json(err(ErrCode.INVALID_CREDENTIALS, 'Invalid credentials'), 401);
     });
 
     app.post('/logout', async (c) => {
@@ -73,7 +73,7 @@ export function registerAuthRoutes(app: ApiApp) {
         const result = s.settingsSchema.safeParse(body);
 
         if (!result.success) {
-            return c.json({ error: result.error.issues[0].message }, 400);
+            return c.json(err(ErrCode.VALIDATION, result.error.issues[0].message), 400);
         }
         const { username, password } = result.data;
 

@@ -1,5 +1,6 @@
 import * as s from '../utils/schemas';
 import { softDeleteFolderSubtree } from '../services/trash';
+import { err, ErrCode } from '../utils/common';
 import type { ApiApp } from './types';
 
 export function registerFolderRoutes(app: ApiApp) {
@@ -8,7 +9,7 @@ export function registerFolderRoutes(app: ApiApp) {
         const result = s.folderSchema.safeParse(body);
 
         if (!result.success) {
-            return c.json({ error: result.error.issues[0].message }, 400);
+            return c.json(err(ErrCode.VALIDATION, result.error.issues[0].message), 400);
         }
         const { name, parent_id } = result.data;
 
@@ -19,7 +20,7 @@ export function registerFolderRoutes(app: ApiApp) {
     app.put('/folders/reorder', async (c) => {
         const result = s.reorderSchema.safeParse(await c.req.json());
         if (!result.success) {
-            return c.json({ error: result.error.issues[0].message }, 400);
+            return c.json(err(ErrCode.VALIDATION, result.error.issues[0].message), 400);
         }
         const { orderedIds } = result.data;
 
@@ -29,12 +30,12 @@ export function registerFolderRoutes(app: ApiApp) {
                 .bind(id)
                 .first<{ parent_id: number | null }>();
             if (!folder) {
-                return c.json({ error: 'Folder reorder contains invalid or deleted items' }, 400);
+                return c.json(err(ErrCode.REORDER_INVALID, 'Folder reorder contains invalid or deleted items'), 400);
             }
             if (expectedParentId === undefined) {
                 expectedParentId = folder.parent_id;
             } else if (folder.parent_id !== expectedParentId) {
-                return c.json({ error: 'Folder reorder items must belong to the same parent' }, 400);
+                return c.json(err(ErrCode.REORDER_CROSS_SCOPE, 'Folder reorder items must belong to the same parent'), 400);
             }
         }
 
@@ -47,15 +48,15 @@ export function registerFolderRoutes(app: ApiApp) {
 
     app.put('/folders/:id', async (c) => {
         const idRes = s.idSchema.safeParse(c.req.param('id'));
-        if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+        if (!idRes.success) return c.json(err(ErrCode.INVALID_ID, 'Invalid ID'), 400);
         const id = idRes.data;
 
         const bodyRes = s.folderSchema.partial().safeParse(await c.req.json());
-        if (!bodyRes.success) return c.json({ error: bodyRes.error.issues[0].message }, 400);
+        if (!bodyRes.success) return c.json(err(ErrCode.VALIDATION, bodyRes.error.issues[0].message), 400);
         const { name, parent_id } = bodyRes.data;
 
         if (parent_id === id) {
-            return c.json({ error: 'Cannot move folder into itself' }, 400);
+            return c.json(err(ErrCode.SELF_REFERENCE, 'Cannot move folder into itself'), 400);
         }
 
         if (parent_id) {
@@ -68,7 +69,7 @@ export function registerFolderRoutes(app: ApiApp) {
                 SELECT id FROM descendants WHERE id = ?
             `).bind(id, parent_id).all();
             if (results.length > 0) {
-                return c.json({ error: 'Cannot move folder into one of its subfolders' }, 400);
+                return c.json(err(ErrCode.CIRCULAR_REF, 'Cannot move folder into one of its subfolders'), 400);
             }
         }
 
@@ -84,7 +85,9 @@ export function registerFolderRoutes(app: ApiApp) {
 
     app.delete('/folders/:id', async (c) => {
         const idRes = s.idSchema.safeParse(c.req.param('id'));
-        if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+        if (!idRes.success) return c.json(err(ErrCode.INVALID_ID, 'Invalid ID'), 400);
+        const existing = await c.env.DB.prepare('SELECT id FROM folders WHERE id = ? AND is_deleted = 0').bind(idRes.data).first();
+        if (!existing) return c.json(err(ErrCode.NOT_FOUND, 'Folder not found'), 404);
         await softDeleteFolderSubtree(c.env.DB, idRes.data);
         return c.json({ success: true });
     });

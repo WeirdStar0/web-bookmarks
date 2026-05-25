@@ -2,7 +2,7 @@ init() {
     if (this.darkMode) document.documentElement.classList.add('dark');
     this.checkAuth();
 
-    this.$watch('currentFolderId', value => localStorage.setItem('currentFolderId', JSON.stringify(value)));
+    this.$watch('currentFolderId', value => { localStorage.setItem('currentFolderId', JSON.stringify(value)); this._sidebarDirty = true; });
     this.$watch('currentView', value => localStorage.setItem('currentView', value));
 },
 
@@ -43,6 +43,7 @@ async loadData() {
     this.folders = data.folders;
     this.bookmarks = data.bookmarks;
     this.calculateFolderCounts();
+    this._sidebarDirty = true;
 },
 
 calculateFolderCounts() {

@@ -68,6 +68,9 @@ get flattenedFolders() {
 },
 
 get sidebarHtml() {
+    if (!this._sidebarDirty && this._sidebarCache !== null) {
+        return this._sidebarCache;
+    }
     const escapeHtml = (unsafe) => {
         if (!unsafe) return '';
         return unsafe
@@ -117,7 +120,9 @@ get sidebarHtml() {
 
     const roots = this.folders.filter(f => !f.parent_id);
     roots.sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
-    return roots.map(f => renderFolder(f)).join('');
+    this._sidebarCache = roots.map(f => renderFolder(f)).join('');
+    this._sidebarDirty = false;
+    return this._sidebarCache;
 },
 
 handleSidebarClick(event) {
@@ -149,4 +154,5 @@ toggleSelector(id) {
 
 toggleFolder(id) {
     this.expandedFolders[id] = !this.expandedFolders[id];
+    this._sidebarDirty = true;
 }

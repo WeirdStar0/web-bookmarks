@@ -91,6 +91,15 @@ app.use('/api/*', cors({
 app.use('*', secureHeaders({
     crossOriginResourcePolicy: false,
     crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-eval'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https://www.google.com"],
+        connectSrc: ["'self'"],
+        frameSrc: ["'none'"],
+        objectSrc: ["'none'"],
+    },
 }));
 
 // Global Error Handler

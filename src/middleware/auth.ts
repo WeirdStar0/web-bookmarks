@@ -1,6 +1,7 @@
 import { Context, Next } from 'hono';
 import { getSignedCookie } from 'hono/cookie';
 import { Bindings, Variables } from '../types';
+import { err, ErrCode } from '../utils/common';
 
 export async function authMiddleware(c: Context<{ Bindings: Bindings; Variables: Variables }>, next: Next) {
     const url = new URL(c.req.url);
@@ -17,7 +18,7 @@ export async function authMiddleware(c: Context<{ Bindings: Bindings; Variables:
     const cookie = await getSignedCookie(c, secret, 'auth');
 
     if (cookie !== 'true') {
-        return c.json({ error: 'Unauthorized' }, 401);
+        return c.json(err(ErrCode.UNAUTHORIZED, 'Unauthorized'), 401);
     }
 
     await next();

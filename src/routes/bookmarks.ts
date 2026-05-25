@@ -1,11 +1,12 @@
 import * as s from '../utils/schemas';
+import { err, ErrCode } from '../utils/common';
 import type { ApiApp } from './types';
 
 export function registerBookmarkRoutes(app: ApiApp) {
     app.post('/bookmarks', async (c) => {
         const body = await c.req.json();
         const result = s.bookmarkSchema.safeParse(body);
-        if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
+        if (!result.success) return c.json(err(ErrCode.VALIDATION, result.error.issues[0].message), 400);
         const { title, url, description, folder_id } = result.data;
 
         await c.env.DB.prepare('INSERT INTO bookmarks (title, url, description, folder_id) VALUES (?, ?, ?, ?)').bind(title, url, description ?? null, folder_id ?? null).run();
@@ -15,7 +16,7 @@ export function registerBookmarkRoutes(app: ApiApp) {
     app.put('/bookmarks/reorder', async (c) => {
         try {
             const result = s.reorderSchema.safeParse(await c.req.json());
-            if (!result.success) return c.json({ error: result.error.issues[0].message }, 400);
+            if (!result.success) return c.json(err(ErrCode.VALIDATION, result.error.issues[0].message), 400);
             const { orderedIds } = result.data;
 
             let expectedFolderId: number | null | undefined;
@@ -24,12 +25,12 @@ export function registerBookmarkRoutes(app: ApiApp) {
                     .bind(id)
                     .first<{ folder_id: number | null }>();
                 if (!bookmark) {
-                    return c.json({ error: 'Bookmark reorder contains invalid or deleted items' }, 400);
+                    return c.json(err(ErrCode.REORDER_INVALID, 'Bookmark reorder contains invalid or deleted items'), 400);
                 }
                 if (expectedFolderId === undefined) {
                     expectedFolderId = bookmark.folder_id;
                 } else if (bookmark.folder_id !== expectedFolderId) {
-                    return c.json({ error: 'Bookmark reorder items must belong to the same folder' }, 400);
+                    return c.json(err(ErrCode.REORDER_CROSS_SCOPE, 'Bookmark reorder items must belong to the same folder'), 400);
                 }
             }
 
@@ -40,17 +41,17 @@ export function registerBookmarkRoutes(app: ApiApp) {
             return c.json({ success: true });
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
-            return c.json({ error: message }, 500);
+            return c.json(err(ErrCode.SERVER_ERROR, message), 500);
         }
     });
 
     app.put('/bookmarks/:id', async (c) => {
         const idRes = s.idSchema.safeParse(c.req.param('id'));
-        if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+        if (!idRes.success) return c.json(err(ErrCode.INVALID_ID, 'Invalid ID'), 400);
         const id = idRes.data;
 
         const bodyRes = s.bookmarkSchema.partial().safeParse(await c.req.json());
-        if (!bodyRes.success) return c.json({ error: bodyRes.error.issues[0].message }, 400);
+        if (!bodyRes.success) return c.json(err(ErrCode.VALIDATION, bodyRes.error.issues[0].message), 400);
         const { title, url, description, folder_id } = bodyRes.data;
 
         const setClauses: string[] = [];
@@ -70,7 +71,9 @@ export function registerBookmarkRoutes(app: ApiApp) {
 
     app.delete('/bookmarks/:id', async (c) => {
         const idRes = s.idSchema.safeParse(c.req.param('id'));
-        if (!idRes.success) return c.json({ error: 'Invalid ID' }, 400);
+        if (!idRes.success) return c.json(err(ErrCode.INVALID_ID, 'Invalid ID'), 400);
+        const existing = await c.env.DB.prepare('SELECT id FROM bookmarks WHERE id = ? AND is_deleted = 0').bind(idRes.data).first();
+        if (!existing) return c.json(err(ErrCode.NOT_FOUND, 'Bookmark not found'), 404);
         await c.env.DB.prepare('UPDATE bookmarks SET is_deleted = 1 WHERE id = ?').bind(idRes.data).run();
         return c.json({ success: true });
     });

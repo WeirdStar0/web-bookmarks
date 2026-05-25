@@ -48,4 +48,7 @@ draggedItem: null,
 dropTarget: null,
 isSorting: false,
 
-t: window.translations
+t: window.translations,
+
+	_sidebarCache: null,
+	_sidebarDirty: true

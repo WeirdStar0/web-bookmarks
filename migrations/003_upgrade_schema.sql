@@ -1,5 +1,13 @@
--- 增量更新数据库架构
--- 执行方式: wrangler d1 execute bookmarks-db --local --file=./migrations/003_upgrade_schema.sql
+-- Incremental schema upgrade for EXISTING databases (DO NOT use with db:reset)
+-- Prerequisite: database was initialized before sort_order/updated_at columns existed
+-- Execute: wrangler d1 execute bookmarks-db --local --file=./migrations/003_upgrade_schema.sql
+--
+-- NOTE: This migration is intentionally excluded from db:reset because schema.sql already
+-- creates tables with these columns. Running it after schema.sql would fail (column exists).
+-- Use only for in-place upgrades of live databases that cannot be dropped.
+--
+-- Run order for upgrading an existing database:
+--   002 → 003 → 004 → 005
 
 -- 1. 为 folders 添加 updated_at
 ALTER TABLE folders ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
