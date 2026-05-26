@@ -148,6 +148,13 @@ Use `npm run check` as the pre-commit and pre-deploy quality gate. It runs asset
 2. Add `id` to `wrangler.toml`.
 3. Re-deploy: `npm run deploy`.
 
+### Allow Browser Extension Access (Optional)
+By default, arbitrary extension origins are not allowed. Set `ALLOWED_EXTENSION_ORIGINS` in `wrangler.toml` or Cloudflare Dashboard, for example:
+```toml
+ALLOWED_EXTENSION_ORIGINS = "chrome-extension://abcdefghijklmnopqrstuvwxyzabcdef"
+```
+This repo uses a fixed extension `key`, so the generated ID stays stable for the same source. If you regenerate the `key`, update the allowlist too.
+
 ## 🧩 Browser Extension
 
 A full-featured extension for the best bookmark saving experience.
@@ -184,6 +191,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ### 2. Immediate Logout?
 - Ensure `SECRET_KEY` is set via `npx wrangler secret put`.
 - If key changed, clear cookies and relogin.
+- If you regenerated the extension `key`, update `ALLOWED_EXTENSION_ORIGINS` with the new `chrome-extension://...` value too.
 
 ### 3. Reset Password
 ```bash

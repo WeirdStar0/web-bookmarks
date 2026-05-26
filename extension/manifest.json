@@ -2,6 +2,7 @@
     "manifest_version": 3,
     "name": "Web Bookmarks",
     "version": "1.0",
+    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA028Ex4v2lnK9b85hJ0MAbJySHLxNeHxhnLckDGwYBNaXyxKFOdHi77BfvWab25WQcW5HAvW8Xndjr7bsZcnkUEFnIpRb9YW/2qiKUBR2JPHi7bIjiBCaHGUPyYdfZ4XF58On4DXzmAovlFwdqhrEyI77/B5ihTktJ093vH4BdyciZvfg454xfSATh0dstGPEcggZdq42WOxxLglw82UaOHgNxsHK+1pfHhlkBqoK7fZOFGFV3gYh0SV+t9ELYAM/U0ntm81Kqw0ji7hb9X42Fwnh9ksCxWiI4/EinR/VmCreW++pbbZIRN4LsBA8nqtGBoXMhsy1rwOeFz1dEsuNgQIDAQAB",
     "default_locale": "zh_CN",
     "description": "__MSG_extDesc__",
     "permissions": [

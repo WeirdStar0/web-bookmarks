@@ -165,6 +165,7 @@ npm run dev
    ```toml
    ALLOWED_EXTENSION_ORIGINS = "chrome-extension://abcdefghijklmnopqrstuvwxyzabcdef"
    ```
+4. 这个仓库的扩展已固定 `key`，因此同一份源码生成的扩展 ID 会保持一致；如果你重新生成 `key`，对应 ID 也会变化。
 
 ## 🧩 浏览器扩展 (Browser Extension)
 
@@ -205,6 +206,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ### 2. 登录后立即退出？
 - 确保生产环境的 `SECRET_KEY` 已通过 `npx wrangler secret put SECRET_KEY` 设置，且与本地一致。
 - 如果更换了密钥，请清除浏览器 Cookie 后重新登录。
+- 如果你重新生成过扩展 `key`，也要同步更新 `ALLOWED_EXTENSION_ORIGINS` 里的 `chrome-extension://...`。
 
 ### 3. 如何重置密码？
 当前密码在数据库中以哈希形式存储，不能直接把明文密码写进 `settings.password`。
