@@ -28,11 +28,6 @@ type BookmarkRow = {
     updated_at: string;
 };
 
-type SettingsRow = {
-    key: string;
-    value: string;
-};
-
 class MockPreparedStatement {
     private bindings: unknown[] = [];
 

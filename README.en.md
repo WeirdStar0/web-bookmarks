@@ -45,7 +45,7 @@ A modern bookmark management system built on Cloudflare Workers and D1 database.
 
 ## 📋 Development Requirements
 
-- Node.js 20.x or higher
+- Node.js 20.19.0 or higher
 - Wrangler CLI
 
 

@@ -30,6 +30,7 @@ Thumbs.db
 # Build output
 dist/
 build/
+dist_extensions/
 
 # Database (local development)
 *.db

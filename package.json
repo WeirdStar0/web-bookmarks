@@ -3,6 +3,9 @@
   "version": "1.1.0",
   "description": "现代化书签管理系统 - 基于 Cloudflare Workers 和 D1",
   "main": "index.js",
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "build:app-asset": "node scripts/build_app_asset.js",
     "build:app-css": "node scripts/build_app_css.js",

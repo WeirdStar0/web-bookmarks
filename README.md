@@ -46,7 +46,7 @@
 
 ## 📋 开发前置要求
 
-- Node.js 20.x 或更高版本
+- Node.js 20.19.0 或更高版本
 - Wrangler CLI (Cloudflare 开发工具)
 
 
