@@ -9,6 +9,9 @@ init() {
 async checkAuth() {
     try {
         await this.loadData();
+        if (this.currentView === 'trash') {
+            await this.loadTrash();
+        }
         this.loggedIn = true;
     } catch (e) {
         this.loggedIn = false;
