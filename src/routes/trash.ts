@@ -19,9 +19,12 @@ export function registerTrashRoutes(app: ApiApp) {
     app.post('/restore/folders/:id', async (c) => {
         const idRes = s.idSchema.safeParse(c.req.param('id'));
         if (!idRes.success) return c.json(err(ErrCode.INVALID_ID, 'Invalid ID'), 400);
-        const restored = await restoreFolderSubtreeFromTrash(c.env.DB, idRes.data);
-        if (!restored) {
+        const result = await restoreFolderSubtreeFromTrash(c.env.DB, idRes.data);
+        if (result === 'not_found_in_trash') {
             return c.json(err(ErrCode.NOT_FOUND, 'Folder not found in trash'), 404);
+        }
+        if (result === 'parent_folder_in_trash') {
+            return c.json(err(ErrCode.PARENT_IN_TRASH, 'Parent folder is still in trash'), 409);
         }
         return c.json({ success: true });
     });

@@ -111,11 +111,21 @@ deleteBookmark(id) {
 },
 
 async restoreFolder(id) {
-    await this.postAndRefresh('/api/restore/folders/' + id, { refreshTrash: true });
+    try {
+        await this.postAndRefresh('/api/restore/folders/' + id, { refreshTrash: true });
+        this.showToast(window.translations.toast.restoreSuccess, 'success');
+    } catch (e) {
+        this.showToast(e.message || 'Error', 'error');
+    }
 },
 
 async restoreBookmark(id) {
-    await this.postAndRefresh('/api/restore/bookmarks/' + id, { refreshTrash: true });
+    try {
+        await this.postAndRefresh('/api/restore/bookmarks/' + id, { refreshTrash: true });
+        this.showToast(window.translations.toast.restoreSuccess, 'success');
+    } catch (e) {
+        this.showToast(e.message || 'Error', 'error');
+    }
 },
 
 permanentDeleteFolder(id) {

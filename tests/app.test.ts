@@ -130,6 +130,12 @@ class MockD1Database {
             return bookmark ? ({ id: bookmark.id, folder_id: bookmark.folder_id } as T) : null;
         }
 
+        if (normalized.startsWith('SELECT id, parent_id FROM folders WHERE id = ? AND is_deleted = 1')) {
+            const id = Number(bindings[0]);
+            const folder = this.folders.find((item) => item.id === id && item.is_deleted === 1) ?? null;
+            return folder ? ({ id: folder.id, parent_id: folder.parent_id } as T) : null;
+        }
+
         if (normalized.startsWith('SELECT id FROM folders WHERE id = ? AND is_deleted = 0')) {
             const id = Number(bindings[0]);
             const folder = this.folders.find((item) => item.id === id && item.is_deleted === 0) ?? null;
@@ -990,6 +996,49 @@ describe('web-bookmarks app', () => {
             message: 'Folder not found in trash',
         });
         expect(db.folders[0].is_deleted).toBe(0);
+    });
+
+    it('rejects restoring a folder if its parent folder is still in trash', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+
+        const now = new Date().toISOString();
+        db.folders.push({
+            id: 100,
+            name: 'ParentTrashFolder',
+            parent_id: null,
+            sort_order: 0,
+            is_deleted: 1,
+            created_at: now,
+            updated_at: now,
+        });
+
+        db.folders.push({
+            id: 101,
+            name: 'ChildTrashFolder',
+            parent_id: 100,
+            sort_order: 0,
+            is_deleted: 1,
+            created_at: now,
+            updated_at: now,
+        });
+
+        const restoreResponse = await app.fetch(new Request('https://example.com/api/restore/folders/101', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+        }), env);
+
+        expect(restoreResponse.status).toBe(409);
+        expect(await restoreResponse.json()).toMatchObject({
+            error: 'PARENT_IN_TRASH',
+            message: 'Parent folder is still in trash',
+        });
+
+        const child = db.folders.find((f) => f.id === 101);
+        expect(child?.is_deleted).toBe(1);
     });
 
     it('only returns CORS headers for configured extension origins', async () => {

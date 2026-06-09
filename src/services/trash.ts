@@ -56,8 +56,27 @@ export async function softDeleteFolderSubtree(db: D1Database, folderId: number) 
     await markFolderSubtreeDeleted(db, folderId, 1);
 }
 
-export async function restoreFolderSubtreeFromTrash(db: D1Database, folderId: number) {
-    return markFolderSubtreeDeleted(db, folderId, 0);
+export type RestoreFolderResult = 'ok' | 'not_found_in_trash' | 'parent_folder_in_trash';
+
+export async function restoreFolderSubtreeFromTrash(db: D1Database, folderId: number): Promise<RestoreFolderResult> {
+    const folder = await db.prepare('SELECT id, parent_id FROM folders WHERE id = ? AND is_deleted = 1')
+        .bind(folderId)
+        .first<{ id: number; parent_id: number | null }>();
+    if (!folder) {
+        return 'not_found_in_trash';
+    }
+
+    if (folder.parent_id !== null) {
+        const parentFolder = await db.prepare('SELECT id FROM folders WHERE id = ? AND is_deleted = 0')
+            .bind(folder.parent_id)
+            .first<{ id: number }>();
+        if (!parentFolder) {
+            return 'parent_folder_in_trash';
+        }
+    }
+
+    await markFolderSubtreeDeleted(db, folderId, 0);
+    return 'ok';
 }
 
 export async function permanentlyDeleteFolderSubtreeFromTrash(db: D1Database, folderId: number) {
