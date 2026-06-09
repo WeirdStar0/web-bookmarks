@@ -1,3 +1,11 @@
+-- 检测当前是否是全新数据库（即 folders 表是否尚不存在）
+CREATE TABLE IF NOT EXISTS _init_status (is_new INTEGER);
+INSERT INTO _init_status (is_new) 
+SELECT 1 
+WHERE NOT EXISTS (
+  SELECT 1 FROM sqlite_master WHERE type='table' AND name='folders'
+);
+
 CREATE TABLE IF NOT EXISTS folders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
@@ -89,15 +97,22 @@ CREATE INDEX IF NOT EXISTS idx_bookmarks_created_at ON bookmarks(created_at DESC
 CREATE INDEX IF NOT EXISTS idx_bookmarks_url_folder ON bookmarks(url, folder_id);
 CREATE INDEX IF NOT EXISTS idx_bookmarks_sort_order ON bookmarks(sort_order ASC, created_at ASC) WHERE is_deleted = 0;
 
--- Mark historical migrations as applied for new databases
+-- Mark historical migrations as applied ONLY for new databases
 CREATE TABLE IF NOT EXISTS d1_migrations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT UNIQUE,
   applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-INSERT OR IGNORE INTO d1_migrations (name) VALUES 
-('002_add_indexes.sql'),
-('003_upgrade_schema.sql'),
-('004_enforce_trash_consistency.sql'),
-('005_add_bookmark_sort_index.sql');
+
+INSERT OR IGNORE INTO d1_migrations (name)
+SELECT name_val FROM (
+  SELECT '002_add_indexes.sql' AS name_val UNION ALL
+  SELECT '003_upgrade_schema.sql' AS name_val UNION ALL
+  SELECT '004_enforce_trash_consistency.sql' AS name_val UNION ALL
+  SELECT '005_add_bookmark_sort_index.sql' AS name_val
+)
+WHERE (SELECT COUNT(*) FROM _init_status) > 0;
+
+DROP TABLE IF EXISTS _init_status;
+
 
