@@ -102,10 +102,8 @@ npm install
 2. **Configure Local DB**
 ```bash
 npx wrangler d1 create bookmarks-db
-npx wrangler d1 execute bookmarks-db --local --file=./schema.sql
-npx wrangler d1 execute bookmarks-db --local --file=./migrations/002_add_indexes.sql
-npx wrangler d1 execute bookmarks-db --local --file=./migrations/004_enforce_trash_consistency.sql
-npx wrangler d1 execute bookmarks-db --local --file=./migrations/005_add_bookmark_sort_index.sql
+# Initialize table schema and indexes (local mode, fresh DB)
+npm run db:init:local
 ```
 
 3. **Environment Setup**
@@ -124,6 +122,18 @@ INITIAL_ADMIN_PASSWORD=your-initial-admin-password
 npm run dev
 ```
 Visit `http://localhost:8787`. Local development falls back to `admin` / `123456` when `INITIAL_ADMIN_PASSWORD` is not set; production requires an explicit initial password.
+
+5. **Database Migration (For Existing Databases)**
+If your database has already been initialized, **do NOT run schema.sql or any db:init commands**, as it might lead to conflict in migration states.
+Upgrade your database safely using Cloudflare D1's migration features:
+```bash
+# Upgrade local development DB
+npm run db:migrate:local
+
+# Upgrade remote production DB
+npm run db:migrate:remote
+```
+
 
 Frontend assets are generated locally. Do not edit generated files directly:
 - `src/templates/appAsset.ts` from `npm run build:app-asset`

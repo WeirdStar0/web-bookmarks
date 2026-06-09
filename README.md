@@ -108,11 +108,8 @@ npm install
 # 创建本地 D1 数据库实例
 npx wrangler d1 create bookmarks-db
 
-# 运行 SQL 初始化表结构 (本地模式)
-npx wrangler d1 execute bookmarks-db --local --file=./schema.sql
-npx wrangler d1 execute bookmarks-db --local --file=./migrations/002_add_indexes.sql
-npx wrangler d1 execute bookmarks-db --local --file=./migrations/004_enforce_trash_consistency.sql
-npx wrangler d1 execute bookmarks-db --local --file=./migrations/005_add_bookmark_sort_index.sql
+# 运行 SQL 初始化表结构 (本地模式，全新数据库)
+npm run db:init:local
 ```
 
 ### 3. 环境变量配置
@@ -132,6 +129,18 @@ INITIAL_ADMIN_PASSWORD=你的初始管理员密码
 npm run dev
 ```
 访问 `http://localhost:8787`。本地开发未设置 `INITIAL_ADMIN_PASSWORD` 时默认账号为 `admin` / 密码 `123456`；生产环境必须显式设置初始密码。
+
+### 5. 旧数据库升级 (数据库迁移)
+如果你的数据库是之前已初始化的旧数据库，**请绝对不要运行 schema.sql 重新初始化**（或运行 db:init 命令），否则可能会引发状态冲突。
+请明确走 D1 官方的迁移路径进行无损升级：
+```bash
+# 升级本地开发数据库
+npm run db:migrate:local
+
+# 升级远程线上数据库
+npm run db:migrate:remote
+```
+
 
 前端资源由本地构建链自动生成，不要直接手改生成产物：
 - `src/templates/appAsset.ts` 由 `npm run build:app-asset` 生成
