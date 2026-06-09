@@ -238,17 +238,36 @@ class MockD1Database {
         }
 
         if (normalized.startsWith('INSERT INTO folders (name, parent_id) VALUES (?, ?)')) {
+            const folderName = String(bindings[0]);
+            if (folderName === 'FAIL_FOLDER') {
+                throw new Error('Simulated D1 DB write failure');
+            }
             const id = this.folderId++;
             const now = new Date().toISOString();
             this.folders.push({
                 id,
-                name: String(bindings[0]),
+                name: folderName,
                 parent_id: toNullableNumber(bindings[1]),
                 sort_order: 0,
                 is_deleted: 0,
                 created_at: now,
                 updated_at: now,
             });
+
+            if (folderName === 'CONFLICT_PARENT') {
+                this.bookmarks.push({
+                    id: this.bookmarkId++,
+                    title: 'Conflict Bookmark (Concurrent)',
+                    url: 'https://example.org/conflict',
+                    description: null,
+                    folder_id: id,
+                    sort_order: 0,
+                    is_deleted: 0,
+                    created_at: now,
+                    updated_at: now,
+                });
+            }
+
             return { success: true, meta: { last_row_id: id } };
         }
 
@@ -477,6 +496,8 @@ function createEnv() {
         SESSION_MAX_AGE: '3600',
         RATE_LIMIT_MAX: '100',
         RATE_LIMIT_WINDOW: '60',
+        RATE_LIMIT_LOGIN_MAX: '5',
+        RATE_LIMIT_LOGIN_WINDOW: '60',
     };
 }
 
@@ -1572,5 +1593,312 @@ describe('web-bookmarks app', () => {
         const data2 = await response2.json() as { bookmarks: BookmarkRow[] };
         expect(data2.bookmarks).toHaveLength(1);
         expect(data2.bookmarks[0].title).toBe('test%_pattern');
+    });
+
+    it('enforces strict rate limiting on login endpoint', async () => {
+        env.RATE_LIMIT_LOGIN_MAX = '2';
+        env.RATE_LIMIT_LOGIN_WINDOW = '60';
+
+        const makeLoginRequest = () => app.fetch(new Request('https://example.com/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Origin: 'https://example.com',
+                'cf-connecting-ip': '203.0.113.50',
+            },
+            body: JSON.stringify({ username: 'admin', password: 'wrong-password' }),
+        }), env);
+
+        expect((await makeLoginRequest()).status).toBe(401);
+        expect((await makeLoginRequest()).status).toBe(401);
+
+        const limitedResponse = await makeLoginRequest();
+        expect(limitedResponse.status).toBe(429);
+        expect(await limitedResponse.json()).toMatchObject({
+            error: 'RATE_LIMITED',
+        });
+    });
+
+    it('enforces size and complexity limits on import endpoint', async () => {
+        const cookie = await login(env);
+
+        const sizeResponse = await app.fetch(new Request('https://example.com/api/import', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+                'Content-Length': (3 * 1024 * 1024).toString(),
+            },
+            body: 'a'.repeat(100),
+        }), env);
+        expect(sizeResponse.status).toBe(413);
+
+        let deepHtml = '<!DOCTYPE NETSCAPE-Bookmark-file-1>';
+        for(let i=0; i<15; i++) {
+            deepHtml += `<DL><p><DT><H3>Folder ${i}</H3>`;
+        }
+        deepHtml += '<DT><A HREF="https://nested.com">Nested</A>';
+        for(let i=0; i<15; i++) {
+            deepHtml += '</DL><p>';
+        }
+
+        const depthResponse = await app.fetch(new Request('https://example.com/api/import', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: deepHtml,
+        }), env);
+        expect(depthResponse.status).toBe(200);
+        const data = await depthResponse.json() as any;
+        expect(data.success).toBe(true);
+    });
+
+    it('handles dry-run query param correctly in import endpoint', async () => {
+        const cookie = await login(env);
+        const importHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+    <DT><H3>DryRun Folder</H3>
+    <DL><p>
+        <DT><A HREF="https://dryrun.org">DryRun Bookmark</A>
+    </DL><p>
+</DL><p>`;
+
+        const response = await app.fetch(new Request('https://example.com/api/import?dryRun=true', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: importHtml,
+        }), env);
+
+        expect(response.status).toBe(200);
+        const result = await response.json() as any;
+        expect(result).toMatchObject({
+            success: true,
+            dryRun: true,
+            imported: { folders: 1, bookmarks: 1 },
+            skipped: { folders: 0, bookmarks: 0 }
+        });
+
+        const db = env.DB as unknown as MockD1Database;
+        const folders = db.folders.filter(f => f.name === 'DryRun Folder');
+        const bookmarks = db.bookmarks.filter(b => b.title === 'DryRun Bookmark');
+        expect(folders).toHaveLength(0);
+        expect(bookmarks).toHaveLength(0);
+    });
+
+    it('returns CSP header with style-src unsafe-inline and without script-src unsafe-inline', async () => {
+        const response = await app.fetch(new Request('https://example.com/'), env);
+        expect(response.status).toBe(200);
+        const csp = response.headers.get('content-security-policy');
+        expect(csp).toBeTruthy();
+        expect(csp).toContain("style-src 'self' 'unsafe-inline'");
+        expect(csp).toContain("script-src 'self' 'unsafe-eval'");
+        expect(csp).not.toContain("script-src 'self' 'unsafe-inline'");
+    });
+
+    it('enforces folder limits on import endpoint and prevents DB pollution', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+        const initialFoldersCount = db.folders.length;
+
+        // 生成 201 个不同的文件夹
+        let overLimitHtml = '<!DOCTYPE NETSCAPE-Bookmark-file-1><DL><p>';
+        for (let i = 0; i < 201; i++) {
+            overLimitHtml += `<DT><H3>Folder ${i}</H3><DL><p></DL><p>`;
+        }
+        overLimitHtml += '</DL><p>';
+
+        const response = await app.fetch(new Request('https://example.com/api/import', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: overLimitHtml,
+        }), env);
+
+        expect(response.status).toBe(400);
+        const data = await response.json() as any;
+        expect(data).toMatchObject({
+            error: 'LIMIT_EXCEEDED',
+        });
+        
+        // 验证数据库没有任何写入
+        expect(db.folders.length).toBe(initialFoldersCount);
+    });
+
+    it('dry-run and real import return identical deduplication statistics for nested virtual structures', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+        const initialFolders = db.folders.length;
+        const initialBookmarks = db.bookmarks.length;
+
+        const importHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+    <DT><H3>Parent</H3>
+    <DL><p>
+        <DT><H3>SubFolder</H3>
+        <DL><p></DL><p>
+        <DT><H3>SubFolder</H3>
+        <DL><p></DL><p>
+        <DT><A HREF="https://example.org/a">Bookmark A</A>
+        <DT><A HREF="https://example.org/b">Bookmark B</A>
+        <DT><A HREF="https://example.org/a">Bookmark A Dup</A>
+    </DL><p>
+</DL><p>`;
+
+        // 1. Dry run
+        const dryRunResponse = await app.fetch(new Request('https://example.com/api/import?dryRun=true', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: importHtml,
+        }), env);
+
+        expect(dryRunResponse.status).toBe(200);
+        const dryResult = await dryRunResponse.json() as any;
+        expect(dryResult).toMatchObject({
+            success: true,
+            dryRun: true,
+            imported: { folders: 2, bookmarks: 2 },
+            skipped: { folders: 1, bookmarks: 1 }
+        });
+        expect(db.folders.length).toBe(initialFolders);
+        expect(db.bookmarks.length).toBe(initialBookmarks);
+
+        // 2. Real import
+        const realResponse = await app.fetch(new Request('https://example.com/api/import', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: importHtml,
+        }), env);
+
+        expect(realResponse.status).toBe(200);
+        const realResult = await realResponse.json() as any;
+        expect(realResult).toMatchObject({
+            success: true,
+            imported: { folders: 2, bookmarks: 2 },
+            skipped: { folders: 1, bookmarks: 1 }
+        });
+        expect(db.folders.length).toBe(initialFolders + 2);
+        expect(db.bookmarks.length).toBe(initialBookmarks + 2);
+    });
+
+    it('rejects large import payloads even if Content-Length header is missing', async () => {
+        const cookie = await login(env);
+        const largeBody = 'a'.repeat(2 * 1024 * 1024 + 1);
+
+        const response = await app.fetch(new Request('https://example.com/api/import', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+                // 故意不传 Content-Length
+            },
+            body: largeBody,
+        }), env);
+
+        expect(response.status).toBe(413);
+        const data = await response.json() as any;
+        expect(data).toMatchObject({
+            error: 'PAYLOAD_TOO_LARGE',
+        });
+    });
+
+    it('renders translations safely in dataset using URL encoding', async () => {
+        const response = await app.fetch(new Request('https://example.com/'), env);
+        expect(response.status).toBe(200);
+        const htmlText = await response.text();
+        const match = htmlText.match(/data-translations="([^"]+)"/);
+        expect(match).toBeTruthy();
+        const encoded = match![1];
+        expect(() => JSON.parse(decodeURIComponent(encoded))).not.toThrow();
+        const parsed = JSON.parse(decodeURIComponent(encoded));
+        expect(parsed).toHaveProperty('lang');
+    });
+
+    it('cascades folder creation failures to subfolders and bookmarks and updates counts', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+        const initialFolders = db.folders.length;
+        const initialBookmarks = db.bookmarks.length;
+
+        const importHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+    <DT><H3>FAIL_FOLDER</H3>
+    <DL><p>
+        <DT><H3>SubFolder</H3>
+        <DL><p></DL><p>
+        <DT><A HREF="https://example.org/child">Child Bookmark</A>
+    </DL><p>
+</DL><p>`;
+
+        const response = await app.fetch(new Request('https://example.com/api/import', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: importHtml,
+        }), env);
+
+        expect(response.status).toBe(200);
+        const result = await response.json() as any;
+        expect(result).toMatchObject({
+            success: true,
+            imported: { folders: 0, bookmarks: 0 },
+        });
+        
+        expect(result.failures).toHaveLength(3);
+        expect(result.failures[0]).toMatchObject({ type: 'folder', name: 'FAIL_FOLDER' });
+        expect(result.failures[1]).toMatchObject({ type: 'folder', name: 'SubFolder', error: '父文件夹创建失败，级联跳过' });
+        expect(result.failures[2]).toMatchObject({ type: 'bookmark', name: 'Child Bookmark', error: '父文件夹创建失败，级联跳过' });
+
+        expect(db.folders.length).toBe(initialFolders);
+        expect(db.bookmarks.length).toBe(initialBookmarks);
+    });
+
+    it('correctly reverts bookmark import count when skipped during physical database insertion', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+
+        const importHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+    <DT><H3>CONFLICT_PARENT</H3>
+    <DL><p>
+        <DT><A HREF="https://example.org/conflict">Conflict Bookmark</A>
+    </DL><p>
+</DL><p>`;
+
+        const response = await app.fetch(new Request('https://example.com/api/import', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: importHtml,
+        }), env);
+
+        expect(response.status).toBe(200);
+        const result = await response.json() as any;
+        expect(result).toMatchObject({
+            success: true,
+            imported: { folders: 1, bookmarks: 0 },
+            skipped: { folders: 0, bookmarks: 1 },
+        });
+
+        const conflictParentId = db.folders.find(f => f.name === 'CONFLICT_PARENT')?.id;
+        expect(conflictParentId).toBeDefined();
+        const bookmarksInParent = db.bookmarks.filter(b => b.folder_id === conflictParentId);
+        expect(bookmarksInParent).toHaveLength(1);
     });
 });

@@ -62,6 +62,8 @@ export function getConfig(env: Bindings) {
         sessionMaxAge: parseInt(env.SESSION_MAX_AGE || '604800'), // 7 days
         rateLimitMax: parseInt(env.RATE_LIMIT_MAX || '100'),
         rateLimitWindow: parseInt(env.RATE_LIMIT_WINDOW || '60'), // 60 seconds
+        rateLimitLoginMax: parseInt(env.RATE_LIMIT_LOGIN_MAX || '5'),
+        rateLimitLoginWindow: parseInt(env.RATE_LIMIT_LOGIN_WINDOW || '60'), // 60 seconds
     };
 }
 

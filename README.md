@@ -82,7 +82,7 @@
    npx wrangler login
    npx wrangler d1 create bookmarks-db
    # 将输出的 database_id 填入 wrangler.toml (必须在 [[d1_databases]] 下填写)
-   npm run db:reset:remote
+   npm run db:init:remote
    ```
 
 3. **设置密钥、初始管理员密码并部署**
@@ -213,11 +213,12 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 推荐做法：
 - 登录后在页面“设置”中修改用户名和密码
-- 如果你只是想回到默认管理员密码，可以删除 `settings` 表中的 `password` 记录后再走初始化流程，或直接重置数据库：
+- 如果你只是想回到默认管理员密码，可以删除 settings 表中的 password 记录后再走初始化流程。
+- ⚠️ 注意：不要轻易在生产环境中抹除数据。如需在本地完全重新开始，可以使用本地重置命令：
 ```bash
-npm run db:reset:remote
+npm run db:reset:local
 ```
-重置后生产环境需要通过 `INITIAL_ADMIN_PASSWORD` 重新初始化管理员密码；本地开发仍可使用 `admin` / `123456`。
+重置后本地开发仍可使用 admin / 123456；生产环境需要通过配置 INITIAL_ADMIN_PASSWORD 来进行新管理员初始化。
 
 ### 4. 速率限制不生效？
 - 确保已创建 KV 命名空间：`npx wrangler kv:namespace create RATE_LIMIT_KV`

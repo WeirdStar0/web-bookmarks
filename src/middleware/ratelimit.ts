@@ -14,9 +14,12 @@ export async function rateLimitMiddleware(c: Context<{ Bindings: Bindings; Varia
     }
 
     const ip = c.req.header('cf-connecting-ip') || 'unknown';
-    const key = `ratelimit:${ip}`;
+    const isLogin = c.req.path === '/api/login';
+    const key = isLogin ? `ratelimit:login:${ip}` : `ratelimit:${ip}`;
+    const limitMax = isLogin ? config.rateLimitLoginMax : config.rateLimitMax;
+    const limitWindow = isLogin ? config.rateLimitLoginWindow : config.rateLimitWindow;
     const now = Date.now();
-    const windowMs = config.rateLimitWindow * 1000;
+    const windowMs = limitWindow * 1000;
 
     try {
         // NOTE: KV get-then-put is not atomic. Under high concurrency two requests
@@ -25,9 +28,9 @@ export async function rateLimitMiddleware(c: Context<{ Bindings: Bindings; Varia
         const data = await c.env.RATE_LIMIT_KV.get(key, 'json') as { count: number; resetTime: number } | null;
 
         if (!data || data.resetTime < now) {
-            await c.env.RATE_LIMIT_KV.put(key, JSON.stringify({ count: 1, resetTime: now + windowMs }), { expirationTtl: config.rateLimitWindow });
+            await c.env.RATE_LIMIT_KV.put(key, JSON.stringify({ count: 1, resetTime: now + windowMs }), { expirationTtl: limitWindow });
         } else {
-            if (data.count >= config.rateLimitMax) {
+            if (data.count >= limitMax) {
                 return c.json(err(ErrCode.RATE_LIMITED, '服务器繁忙，请稍后再试'), 429);
             }
             await c.env.RATE_LIMIT_KV.put(key, JSON.stringify({ count: data.count + 1, resetTime: data.resetTime }), { expirationTtl: Math.ceil((data.resetTime - now) / 1000) });

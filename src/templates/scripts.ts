@@ -1,8 +1,3 @@
-import type { TemplateTranslations } from './types';
-
-export const scripts = (t: TemplateTranslations) => `
-    <script>
-        window.translations = ${JSON.stringify(t)};
-    </script>
+export const scripts = () => `
     <script type="module" src="/assets/app.js"></script>
     `;

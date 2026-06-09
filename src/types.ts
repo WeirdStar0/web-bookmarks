@@ -9,6 +9,8 @@ export interface Bindings {
     SESSION_MAX_AGE?: string;
     RATE_LIMIT_MAX?: string;
     RATE_LIMIT_WINDOW?: string;
+    RATE_LIMIT_LOGIN_MAX?: string;
+    RATE_LIMIT_LOGIN_WINDOW?: string;
 }
 
 export interface Variables {

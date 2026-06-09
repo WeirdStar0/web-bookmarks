@@ -80,7 +80,7 @@ Click the **Deploy to Cloudflare Workers** button. It will:
    npx wrangler login
    npx wrangler d1 create bookmarks-db
    # Fill database_id into wrangler.toml under [[d1_databases]]
-   npm run db:reset:remote
+   npm run db:init:remote
    ```
 
 3. **Set Secrets and Deploy**
@@ -194,10 +194,13 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 - If you regenerated the extension `key`, update `ALLOWED_EXTENSION_ORIGINS` with the new `chrome-extension://...` value too.
 
 ### 3. Reset Password
+Passwords are stored as hashes, so writing plaintext into `settings.password` is no longer valid.
+- To reset the password, you can delete the `password` record from the `settings` table, then log in again with `INITIAL_ADMIN_PASSWORD`.
+- ⚠️ WARNING: Avoid using database reset commands in production to prevent data loss. If you need to completely reset the database locally, run:
 ```bash
-npm run db:reset:remote
+npm run db:reset:local
 ```
-Passwords are stored as hashes, so writing plaintext into `settings.password` is no longer valid. After a production reset, set `INITIAL_ADMIN_PASSWORD` again before logging in; local development can still fall back to `admin` / `123456`.
+After a local reset, the default local account fallback is `admin` / `123456`.
 
 ## 🔧 Configuration
 

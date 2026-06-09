@@ -1,3 +1,9 @@
+try {
+    window.translations = JSON.parse(decodeURIComponent(document.body.dataset.translations || '{}'));
+} catch (e) {
+    console.error("Failed to parse translations from body dataset", e);
+}
+
 window.app = function app() {
     return {
         __APP_FRAGMENTS_PLACEHOLDER__
