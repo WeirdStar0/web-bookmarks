@@ -71,6 +71,8 @@ export const INIT_SQL = [
       AND EXISTS (
         SELECT 1 FROM folders WHERE id = NEW.folder_id AND is_deleted = 1
       )
+    BEGIN
+      SELECT RAISE(ABORT, 'Cannot keep active bookmark inside deleted folder');
     END`,
     `CREATE TABLE IF NOT EXISTS d1_migrations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

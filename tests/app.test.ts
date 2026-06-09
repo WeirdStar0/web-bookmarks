@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { D1Database, KVNamespace } from '@cloudflare/workers-types';
 import app from '../src/index';
 import { resetInitState } from '../src/middleware/init';
+import { INIT_SQL } from '../src/db/schema';
 import { appAssetSource } from '../src/templates/appAsset';
 import { appCssAssetSource } from '../src/templates/appCssAsset';
 import { vendorAssetSource } from '../src/templates/vendorAsset';
@@ -2227,5 +2228,36 @@ describe('web-bookmarks app', () => {
         expect(folder).toBeTruthy();
         expect(bookmark).toBeTruthy();
         expect(bookmark?.url).toBe('https://example.org/search?q=test&category=news');
+    });
+
+    it('ensures INIT_SQL trigger definitions are syntactically complete and not empty', () => {
+        for (const sql of INIT_SQL) {
+            const normalized = sql.replace(/\s+/g, ' ').trim();
+            const upper = normalized.toUpperCase();
+            
+            if (upper.includes('CREATE TRIGGER')) {
+                expect(upper).toContain(' BEGIN ');
+                expect(upper.endsWith(' END')).toBe(true);
+                
+                const hasAction = upper.includes('SELECT RAISE') || upper.includes('UPDATE ');
+                expect(hasAction).toBe(true);
+            }
+        }
+    });
+
+    it('throws an error when auto-initialization fails during app boot', async () => {
+        resetInitState();
+        const badEnv = createEnv();
+        (badEnv.DB as any).executeRun = async () => {
+            throw new Error('Simulated D1 initialization failure');
+        };
+
+        const response = await app.fetch(new Request('https://example.com/'), badEnv);
+        expect(response.status).toBe(500);
+
+        const body = await response.json() as any;
+        expect(body).toMatchObject({
+            error: 'Internal Server Error',
+        });
     });
 });

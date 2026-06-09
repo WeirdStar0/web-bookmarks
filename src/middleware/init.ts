@@ -28,6 +28,7 @@ export async function initMiddleware(c: Context<{ Bindings: Bindings; Variables:
                 console.log('Database initialized successfully.');
             } catch (initErr) {
                 console.error('Database auto-initialization failed:', initErr);
+                throw new Error(`Database auto-initialization failed: ${(initErr as Error).message}`);
             }
         }
     }
