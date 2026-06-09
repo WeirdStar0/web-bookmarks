@@ -58,6 +58,8 @@ class MockD1Database {
     folders: FolderRow[] = [];
     bookmarks: BookmarkRow[] = [];
     settings = new Map<string, string>();
+    migrations: string[] = [];
+    initialized = false;
     private folderId = 1;
     private bookmarkId = 1;
 
@@ -75,6 +77,10 @@ class MockD1Database {
 
     async executeFirst<T>(sql: string, bindings: unknown[]) {
         const normalized = normalizeSql(sql);
+
+        if (!this.initialized) {
+            throw new Error('no such table: settings (D1 simulated)');
+        }
 
         if (normalized.startsWith('SELECT 1 FROM settings LIMIT 1')) {
             return this.settings.size > 0 ? ({ 1: 1 } as T) : null;
@@ -147,6 +153,10 @@ class MockD1Database {
 
     async executeAll<T>(sql: string, bindings: unknown[]) {
         const normalized = normalizeSql(sql);
+
+        if (!this.initialized) {
+            throw new Error('no such table: settings (D1 simulated)');
+        }
 
         if (normalized.startsWith('SELECT key, value FROM settings')) {
             return {
@@ -228,8 +238,27 @@ class MockD1Database {
     async executeRun(sql: string, bindings: unknown[]) {
         const normalized = normalizeSql(sql);
 
-        if (normalized.startsWith('CREATE TABLE') || normalized.startsWith('CREATE INDEX')) {
+        if (normalized.startsWith('CREATE TABLE')) {
+            this.initialized = true;
             return { success: true, meta: {} };
+        }
+
+        if (normalized.startsWith('CREATE')) {
+            return { success: true, meta: {} };
+        }
+
+        if (normalized.startsWith('INSERT OR IGNORE INTO d1_migrations')) {
+            this.migrations.push(
+                '002_add_indexes.sql',
+                '003_upgrade_schema.sql',
+                '004_enforce_trash_consistency.sql',
+                '005_add_bookmark_sort_index.sql'
+            );
+            return { success: true, meta: {} };
+        }
+
+        if (!this.initialized) {
+            throw new Error('no such table: settings (D1 simulated)');
         }
 
         if (normalized.startsWith('INSERT INTO settings (key, value) VALUES (?, ?)')) {
@@ -2097,5 +2126,19 @@ describe('web-bookmarks app', () => {
         expect(activeFolder).toBeTruthy();
         expect(activeBookmark).toBeTruthy();
         expect(activeBookmark?.folder_id).toBe(activeFolder?.id);
+    });
+
+    it('automatically applies D1 migration stamps on first-visit auto-initialization', async () => {
+        const db = env.DB as unknown as MockD1Database;
+        expect(db.migrations).toHaveLength(0);
+
+        const response = await app.fetch(new Request('https://example.com/'), env);
+        expect(response.status).toBe(200);
+
+        expect(db.migrations).toHaveLength(4);
+        expect(db.migrations).toContain('002_add_indexes.sql');
+        expect(db.migrations).toContain('003_upgrade_schema.sql');
+        expect(db.migrations).toContain('004_enforce_trash_consistency.sql');
+        expect(db.migrations).toContain('005_add_bookmark_sort_index.sql');
     });
 });

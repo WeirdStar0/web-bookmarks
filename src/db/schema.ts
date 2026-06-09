@@ -71,7 +71,15 @@ export const INIT_SQL = [
       AND EXISTS (
         SELECT 1 FROM folders WHERE id = NEW.folder_id AND is_deleted = 1
       )
-    BEGIN
-      SELECT RAISE(ABORT, 'Cannot keep active bookmark inside deleted folder');
-    END`
+    END`,
+    `CREATE TABLE IF NOT EXISTS d1_migrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE,
+        applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `INSERT OR IGNORE INTO d1_migrations (name) VALUES 
+        ('002_add_indexes.sql'),
+        ('003_upgrade_schema.sql'),
+        ('004_enforce_trash_consistency.sql'),
+        ('005_add_bookmark_sort_index.sql')`
 ];
