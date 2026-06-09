@@ -78,3 +78,26 @@ BEGIN
 END;
 
 -- Insert a root folder or some sample data if needed, but for now we keep it clean.
+
+-- Indexes for performance
+CREATE INDEX IF NOT EXISTS idx_folders_parent_id ON folders(parent_id) WHERE is_deleted = 0;
+CREATE INDEX IF NOT EXISTS idx_folders_is_deleted ON folders(is_deleted);
+CREATE INDEX IF NOT EXISTS idx_folders_sort_order ON folders(sort_order ASC, name ASC) WHERE is_deleted = 0;
+CREATE INDEX IF NOT EXISTS idx_bookmarks_folder_id ON bookmarks(folder_id) WHERE is_deleted = 0;
+CREATE INDEX IF NOT EXISTS idx_bookmarks_is_deleted ON bookmarks(is_deleted);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_created_at ON bookmarks(created_at DESC) WHERE is_deleted = 0;
+CREATE INDEX IF NOT EXISTS idx_bookmarks_url_folder ON bookmarks(url, folder_id);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_sort_order ON bookmarks(sort_order ASC, created_at ASC) WHERE is_deleted = 0;
+
+-- Mark historical migrations as applied for new databases
+CREATE TABLE IF NOT EXISTS d1_migrations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT UNIQUE,
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+INSERT OR IGNORE INTO d1_migrations (name) VALUES 
+('002_add_indexes.sql'),
+('003_upgrade_schema.sql'),
+('004_enforce_trash_consistency.sql'),
+('005_add_bookmark_sort_index.sql');
+

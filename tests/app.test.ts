@@ -89,8 +89,21 @@ class MockD1Database {
         if (normalized.startsWith('SELECT id FROM folders WHERE name = ? AND parent_id IS ?')) {
             const name = String(bindings[0]);
             const parentId = toNullableNumber(bindings[1]);
+            if (name === 'QUERY_FAIL_FOLDER') {
+                throw new Error('Simulated D1 folder query failure');
+            }
             const folder = this.folders.find((item) => item.name === name && item.parent_id === parentId) ?? null;
             return folder ? ({ id: folder.id } as T) : null;
+        }
+
+        if (normalized.startsWith('SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ?')) {
+            const url = String(bindings[0]);
+            const folderId = toNullableNumber(bindings[1]);
+            if (url.includes('query-fail-bookmark')) {
+                throw new Error('Simulated D1 bookmark query failure');
+            }
+            const bookmark = this.bookmarks.find((item) => item.url === url && item.folder_id === folderId && item.is_deleted === 0) ?? null;
+            return bookmark ? ({ 1: 1 } as T) : null;
         }
 
         if (normalized.startsWith('SELECT id FROM bookmarks WHERE id = ? AND is_deleted = 1')) {
@@ -1634,11 +1647,11 @@ describe('web-bookmarks app', () => {
         expect(sizeResponse.status).toBe(413);
 
         let deepHtml = '<!DOCTYPE NETSCAPE-Bookmark-file-1>';
-        for(let i=0; i<15; i++) {
+        for(let i=0; i<10; i++) {
             deepHtml += `<DL><p><DT><H3>Folder ${i}</H3>`;
         }
         deepHtml += '<DT><A HREF="https://nested.com">Nested</A>';
-        for(let i=0; i<15; i++) {
+        for(let i=0; i<10; i++) {
             deepHtml += '</DL><p>';
         }
 
@@ -1900,5 +1913,128 @@ describe('web-bookmarks app', () => {
         expect(conflictParentId).toBeDefined();
         const bookmarksInParent = db.bookmarks.filter(b => b.folder_id === conflictParentId);
         expect(bookmarksInParent).toHaveLength(1);
+    });
+
+    it('enforces depth limit on import endpoint and rejects with 400', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+        const initialFolders = db.folders.length;
+
+        // 构建 13 层深度文件夹
+        let deepHtml = '<!DOCTYPE NETSCAPE-Bookmark-file-1>';
+        for (let i = 0; i < 13; i++) {
+            deepHtml += `<DL><p><DT><H3>Level ${i}</H3>`;
+        }
+        deepHtml += '<DT><A HREF="https://nested.com">Nested</A>';
+        for (let i = 0; i < 13; i++) {
+            deepHtml += '</DL><p>';
+        }
+
+        const response = await app.fetch(new Request('https://example.com/api/import', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: deepHtml,
+        }), env);
+
+        expect(response.status).toBe(400);
+        const result = await response.json() as any;
+        expect(result).toMatchObject({
+            error: 'DEPTH_LIMIT_EXCEEDED',
+            message: '导入文件层级过深，最大允许嵌套 12 层',
+        });
+        expect(db.folders.length).toBe(initialFolders);
+    });
+
+    it('skips folder import and nested items when database deduplication query fails', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+        const initialFolders = db.folders.length;
+
+        const importHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+    <DT><H3>QUERY_FAIL_FOLDER</H3>
+    <DL><p>
+        <DT><H3>SubFolder</H3>
+        <DL><p></DL><p>
+        <DT><A HREF="https://example.org/sub">Sub Bookmark</A>
+    </DL><p>
+</DL><p>`;
+
+        const response = await app.fetch(new Request('https://example.com/api/import', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: importHtml,
+        }), env);
+
+        expect(response.status).toBe(200);
+        const result = await response.json() as any;
+        expect(result).toMatchObject({
+            success: true,
+            imported: { folders: 0, bookmarks: 0 },
+            skipped: { folders: 0, bookmarks: 0 },
+        });
+
+        expect(result.failures).toHaveLength(3);
+        expect(result.failures[0]).toMatchObject({
+            type: 'folder',
+            name: 'QUERY_FAIL_FOLDER',
+            error: 'Simulated D1 folder query failure',
+        });
+        expect(result.failures[1]).toMatchObject({
+            type: 'folder',
+            name: 'SubFolder',
+            error: '父文件夹创建失败，级联跳过',
+        });
+        expect(result.failures[2]).toMatchObject({
+            type: 'bookmark',
+            name: 'Sub Bookmark',
+            error: '父文件夹创建失败，级联跳过',
+        });
+
+        // 验证没有任何数据写入数据库
+        expect(db.folders.length).toBe(initialFolders);
+    });
+
+    it('skips bookmark import when database deduplication query fails', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+        const initialBookmarks = db.bookmarks.length;
+
+        const importHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+    <DT><A HREF="https://example.org/query-fail-bookmark">Query Fail Bookmark</A>
+</DL><p>`;
+
+        const response = await app.fetch(new Request('https://example.com/api/import', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: importHtml,
+        }), env);
+
+        expect(response.status).toBe(200);
+        const result = await response.json() as any;
+        expect(result).toMatchObject({
+            success: true,
+            imported: { folders: 0, bookmarks: 0 },
+            skipped: { folders: 0, bookmarks: 0 },
+        });
+
+        expect(result.failures).toHaveLength(1);
+        expect(result.failures[0]).toMatchObject({
+            type: 'bookmark',
+            name: 'Query Fail Bookmark',
+            error: 'Simulated D1 bookmark query failure',
+        });
+
+        expect(db.bookmarks.length).toBe(initialBookmarks);
     });
 });

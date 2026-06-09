@@ -111,6 +111,7 @@ export function registerImportExportRoutes(app: ApiApp) {
             parentTempId: string | null;
             dbId: number | null;
             isNew: boolean;
+            isFailed?: boolean;
         }
 
         interface PlanBookmark {
@@ -144,20 +145,58 @@ export function registerImportExportRoutes(app: ApiApp) {
                     if (stack.length > 1) stack.pop();
                 } else {
                     if (stack.length >= MAX_DEPTH) {
-                        stack.push(stack[stack.length - 1]);
-                    } else {
-                        stack.push(lastFolderTempId);
+                        return c.json({
+                            error: 'DEPTH_LIMIT_EXCEEDED',
+                            message: `导入文件层级过深，最大允许嵌套 ${MAX_DEPTH} 层`
+                        }, 400);
                     }
+                    stack.push(lastFolderTempId);
                 }
             } else if (match[2] !== undefined) {
                 const folderName = stripTags(match[2]);
                 if (!folderName) continue;
 
+                const parentTempId = stack[stack.length - 1];
+                let isParentFailed = false;
+                if (parentTempId !== null) {
+                    const parentFolder = planFolders.find((f) => f.tempId === parentTempId);
+                    if (parentFolder && parentFolder.isFailed) {
+                        isParentFailed = true;
+                    }
+                }
+
+                if (isParentFailed) {
+                    const tempId = `temp-f-${planFolders.length + 1}`;
+                    planFolders.push({
+                        tempId,
+                        name: folderName,
+                        parentTempId,
+                        dbId: null,
+                        isNew: false,
+                        isFailed: true,
+                    });
+                    failures.push({
+                        type: 'folder',
+                        name: folderName,
+                        error: '父文件夹创建失败，级联跳过',
+                    });
+                    lastFolderTempId = tempId;
+                    continue;
+                }
+
                 const folderResult = folderSchema.shape.name.safeParse(folderName);
                 if (!folderResult.success) {
-                    skippedFolders++;
+                    const tempId = `temp-f-${planFolders.length + 1}`;
+                    planFolders.push({
+                        tempId,
+                        name: folderName,
+                        parentTempId,
+                        dbId: null,
+                        isNew: false,
+                        isFailed: true,
+                    });
                     failures.push({ type: 'folder', name: folderName, error: folderResult.error.issues[0].message });
-                    lastFolderTempId = stack[stack.length - 1];
+                    lastFolderTempId = tempId;
                     continue;
                 }
 
@@ -167,8 +206,6 @@ export function registerImportExportRoutes(app: ApiApp) {
                         message: `导入文件夹数超出限制，单次最多允许 ${MAX_FOLDERS} 个`
                     }, 400);
                 }
-
-                const parentTempId = stack[stack.length - 1];
 
                 // Dedupe 去重融合机制
                 // 1. 查 Plan 内存
@@ -196,6 +233,7 @@ export function registerImportExportRoutes(app: ApiApp) {
                         }
                     }
 
+                    let queryFailed = false;
                     if (parentExistsInDb) {
                         try {
                             const dbExisting = await c.env.DB.prepare('SELECT id FROM folders WHERE name = ? AND parent_id IS ?')
@@ -206,7 +244,22 @@ export function registerImportExportRoutes(app: ApiApp) {
                             }
                         } catch (err: unknown) {
                             failures.push({ type: 'folder', name: folderName, error: (err as Error).message || '数据库检索失败' });
+                            queryFailed = true;
                         }
+                    }
+
+                    if (queryFailed) {
+                        const tempId = `temp-f-${planFolders.length + 1}`;
+                        planFolders.push({
+                            tempId,
+                            name: folderName,
+                            parentTempId,
+                            dbId: null,
+                            isNew: false,
+                            isFailed: true,
+                        });
+                        lastFolderTempId = tempId;
+                        continue;
                     }
 
                     const tempId = `temp-f-${planFolders.length + 1}`;
@@ -236,9 +289,25 @@ export function registerImportExportRoutes(app: ApiApp) {
                 const title = stripTags(match[4] || url) || url;
                 const parentTempId = stack[stack.length - 1];
 
+                let isParentFailed = false;
+                if (parentTempId !== null) {
+                    const parentFolder = planFolders.find((f) => f.tempId === parentTempId);
+                    if (parentFolder && parentFolder.isFailed) {
+                        isParentFailed = true;
+                    }
+                }
+
+                if (isParentFailed) {
+                    failures.push({
+                        type: 'bookmark',
+                        name: title,
+                        error: '父文件夹创建失败，级联跳过',
+                    });
+                    continue;
+                }
+
                 const bookmarkResult = bookmarkSchema.safeParse({ title, url, folder_id: null });
                 if (!bookmarkResult.success) {
-                    skippedBookmarks++;
                     failures.push({ type: 'bookmark', name: title, error: bookmarkResult.error.issues[0].message });
                     continue;
                 }
@@ -278,6 +347,7 @@ export function registerImportExportRoutes(app: ApiApp) {
                         }
                     }
 
+                    let queryFailed = false;
                     if (parentExistsInDb) {
                         try {
                             const existing = await c.env.DB.prepare('SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ?')
@@ -288,7 +358,12 @@ export function registerImportExportRoutes(app: ApiApp) {
                             }
                         } catch (err: unknown) {
                             failures.push({ type: 'bookmark', name: title, error: (err as Error).message || '数据库检索失败' });
+                            queryFailed = true;
                         }
+                    }
+
+                    if (queryFailed) {
+                        continue;
                     }
                 }
 
@@ -321,6 +396,10 @@ export function registerImportExportRoutes(app: ApiApp) {
 
         // 1. 物理创建文件夹
         for (const folder of planFolders) {
+            if (folder.isFailed) {
+                tempIdToRealIdMap.set(folder.tempId, undefined);
+                continue;
+            }
             if (!folder.isNew) {
                 tempIdToRealIdMap.set(folder.tempId, folder.dbId!);
             } else {
