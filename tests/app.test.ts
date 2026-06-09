@@ -2148,9 +2148,9 @@ describe('web-bookmarks app', () => {
 
         const importHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <DL><p>
-    <DT><H3>A &amp; B Folder</H3>
+    <DT><H3>A &amp; B &#128512; Folder</H3>
     <DL><p>
-        <DT><A HREF="https://example.org/search?q=test&amp;category=news">Query &amp; Search</A>
+        <DT><A HREF="https://example.org/search?q=test&amp;category=news">Query &amp; Search &#x1F600; &#1114112;</A>
     </DL><p>
 </DL><p>`;
 
@@ -2172,8 +2172,8 @@ describe('web-bookmarks app', () => {
             skipped: { folders: 0, bookmarks: 0 },
         });
 
-        const folder = db.folders.find((f) => f.name === 'A & B Folder' && f.is_deleted === 0);
-        const bookmark = db.bookmarks.find((b) => b.title === 'Query & Search' && b.is_deleted === 0);
+        const folder = db.folders.find((f) => f.name === 'A & B 😀 Folder' && f.is_deleted === 0);
+        const bookmark = db.bookmarks.find((b) => b.title === 'Query & Search 😀 &#1114112;' && b.is_deleted === 0);
 
         expect(folder).toBeTruthy();
         expect(bookmark).toBeTruthy();

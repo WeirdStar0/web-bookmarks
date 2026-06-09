@@ -23,8 +23,24 @@ function decodeHtmlEntities(str: string): string {
         .replace(/&gt;/g, '>')
         .replace(/&#x2F;/g, '/')
         .replace(/&mdash;/g, '—')
-        .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
-        .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+        .replace(/&#(\d+);/g, (match, dec) => {
+            try {
+                const code = parseInt(dec, 10);
+                if (code >= 0 && code <= 0x10ffff) {
+                    return String.fromCodePoint(code);
+                }
+            } catch (_) {}
+            return match;
+        })
+        .replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => {
+            try {
+                const code = parseInt(hex, 16);
+                if (code >= 0 && code <= 0x10ffff) {
+                    return String.fromCodePoint(code);
+                }
+            } catch (_) {}
+            return match;
+        });
 }
 
 function generateNetscapeHTML(folders: FolderRow[], bookmarks: BookmarkRow[], parentId: number | null = null, indent: string = ''): string {
