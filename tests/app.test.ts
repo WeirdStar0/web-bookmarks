@@ -86,17 +86,17 @@ class MockD1Database {
             return value === undefined ? null : ({ value } as T);
         }
 
-        if (normalized.startsWith('SELECT id FROM folders WHERE name = ? AND parent_id IS ?')) {
+        if (normalized.startsWith('SELECT id FROM folders WHERE name = ? AND parent_id IS ? AND is_deleted = 0')) {
             const name = String(bindings[0]);
             const parentId = toNullableNumber(bindings[1]);
             if (name === 'QUERY_FAIL_FOLDER') {
                 throw new Error('Simulated D1 folder query failure');
             }
-            const folder = this.folders.find((item) => item.name === name && item.parent_id === parentId) ?? null;
+            const folder = this.folders.find((item) => item.name === name && item.parent_id === parentId && item.is_deleted === 0) ?? null;
             return folder ? ({ id: folder.id } as T) : null;
         }
 
-        if (normalized.startsWith('SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ?')) {
+        if (normalized.startsWith('SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ? AND is_deleted = 0')) {
             const url = String(bindings[0]);
             const folderId = toNullableNumber(bindings[1]);
             if (url.includes('query-fail-bookmark')) {
@@ -305,7 +305,7 @@ class MockD1Database {
             const title = String(bindings[0]);
             const url = String(bindings[1]);
             const folderId = toNullableNumber(bindings[2]);
-            const exists = this.bookmarks.some((item) => item.url === String(bindings[3]) && item.folder_id === toNullableNumber(bindings[4]));
+            const exists = this.bookmarks.some((item) => item.url === String(bindings[3]) && item.folder_id === toNullableNumber(bindings[4]) && item.is_deleted === 0);
 
             if (!exists) {
                 const id = this.bookmarkId++;
@@ -2036,5 +2036,66 @@ describe('web-bookmarks app', () => {
         });
 
         expect(db.bookmarks.length).toBe(initialBookmarks);
+    });
+
+    it('does not skip import deduplication for items in the trash bin (is_deleted = 1)', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+
+        const now = new Date().toISOString();
+        db.folders.push({
+            id: 100,
+            name: 'TrashedFolder',
+            parent_id: null,
+            sort_order: 0,
+            is_deleted: 1,
+            created_at: now,
+            updated_at: now,
+        });
+
+        db.bookmarks.push({
+            id: 200,
+            title: 'TrashedBookmark',
+            url: 'https://example.org/trashed-url',
+            description: null,
+            folder_id: null,
+            sort_order: 0,
+            is_deleted: 1,
+            created_at: now,
+            updated_at: now,
+        });
+
+        const importHtml = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
+<DL><p>
+    <DT><H3>TrashedFolder</H3>
+    <DL><p>
+        <DT><A HREF="https://example.org/trashed-url">New Active Bookmark</A>
+    </DL><p>
+</DL><p>`;
+
+        const response = await app.fetch(new Request('https://example.com/api/import', {
+            method: 'POST',
+            headers: {
+                Cookie: cookie,
+                Origin: 'https://example.com',
+            },
+            body: importHtml,
+        }), env);
+
+        expect(response.status).toBe(200);
+        const result = await response.json() as any;
+
+        expect(result).toMatchObject({
+            success: true,
+            imported: { folders: 1, bookmarks: 1 },
+            skipped: { folders: 0, bookmarks: 0 },
+        });
+
+        const activeFolder = db.folders.find((f) => f.name === 'TrashedFolder' && f.is_deleted === 0);
+        const activeBookmark = db.bookmarks.find((b) => b.url === 'https://example.org/trashed-url' && b.is_deleted === 0);
+
+        expect(activeFolder).toBeTruthy();
+        expect(activeBookmark).toBeTruthy();
+        expect(activeBookmark?.folder_id).toBe(activeFolder?.id);
     });
 });

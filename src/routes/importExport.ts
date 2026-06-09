@@ -236,7 +236,7 @@ export function registerImportExportRoutes(app: ApiApp) {
                     let queryFailed = false;
                     if (parentExistsInDb) {
                         try {
-                            const dbExisting = await c.env.DB.prepare('SELECT id FROM folders WHERE name = ? AND parent_id IS ?')
+                            const dbExisting = await c.env.DB.prepare('SELECT id FROM folders WHERE name = ? AND parent_id IS ? AND is_deleted = 0')
                                 .bind(folderName, realParentId)
                                 .first<{ id: number }>();
                             if (dbExisting) {
@@ -350,7 +350,7 @@ export function registerImportExportRoutes(app: ApiApp) {
                     let queryFailed = false;
                     if (parentExistsInDb) {
                         try {
-                            const existing = await c.env.DB.prepare('SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ?')
+                            const existing = await c.env.DB.prepare('SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ? AND is_deleted = 0')
                                 .bind(url, realParentId)
                                 .first();
                             if (existing) {
@@ -468,7 +468,7 @@ export function registerImportExportRoutes(app: ApiApp) {
             for (let i = 0; i < finalBookmarks.length; i += BATCH_SIZE) {
                 const batch = finalBookmarks.slice(i, i + BATCH_SIZE);
                 const stmts = batch.map((bookmark) => {
-                    return c.env.DB.prepare('INSERT INTO bookmarks (title, url, folder_id) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ?)')
+                    return c.env.DB.prepare('INSERT INTO bookmarks (title, url, folder_id) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ? AND is_deleted = 0)')
                         .bind(bookmark.title, bookmark.url, bookmark.folderId, bookmark.url, bookmark.folderId);
                 });
 
@@ -485,7 +485,7 @@ export function registerImportExportRoutes(app: ApiApp) {
                     console.warn('Batch import failed, falling back to sequential inserts:', (batchErr as Error).message);
                     for (const bookmark of batch) {
                         try {
-                            const existing = await c.env.DB.prepare('SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ?')
+                            const existing = await c.env.DB.prepare('SELECT 1 FROM bookmarks WHERE url = ? AND folder_id IS ? AND is_deleted = 0')
                                 .bind(bookmark.url, bookmark.folderId)
                                 .first();
                             if (!existing) {
