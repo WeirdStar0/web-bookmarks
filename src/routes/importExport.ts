@@ -14,6 +14,18 @@ type BookmarkRow = {
     folder_id: number | null;
 };
 
+function decodeHtmlEntities(str: string): string {
+    return str
+        .replace(/&amp;/g, '&')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&#x2F;/g, '/')
+        .replace(/&mdash;/g, '—')
+        .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+        .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
 
 function generateNetscapeHTML(folders: FolderRow[], bookmarks: BookmarkRow[], parentId: number | null = null, indent: string = ''): string {
     const escapeHtml = (s: string | number | null | undefined) => {
@@ -153,7 +165,7 @@ export function registerImportExportRoutes(app: ApiApp) {
                     stack.push(lastFolderTempId);
                 }
             } else if (match[2] !== undefined) {
-                const folderName = stripTags(match[2]);
+                const folderName = decodeHtmlEntities(stripTags(match[2]));
                 if (!folderName) continue;
 
                 const parentTempId = stack[stack.length - 1];
@@ -285,8 +297,8 @@ export function registerImportExportRoutes(app: ApiApp) {
                     lastFolderTempId = tempId;
                 }
             } else if (match[3]) {
-                const url = match[3];
-                const title = stripTags(match[4] || url) || url;
+                const url = decodeHtmlEntities(match[3]);
+                const title = decodeHtmlEntities(stripTags(match[4] || url) || url);
                 const parentTempId = stack[stack.length - 1];
 
                 let isParentFailed = false;

@@ -271,7 +271,7 @@ export const main = (t: TemplateTranslations) => `
                                         'border-blue-500 shadow-lg shadow-blue-500/20 bg-blue-50 dark:bg-blue-900/20': dropTarget?.type === 'bookmark' && dropTarget?.id === bookmark.id,
                                         'cursor-grab active:cursor-grabbing': isSorting && currentView === 'home' && !searchQuery
                                      }">
-                                    <a :href="currentView === 'home' && !isSorting ? bookmark.url : '#'" :target="currentView === 'home' && !isSorting ? '_blank' : ''" class="flex items-start space-x-3" :class="isSorting ? 'cursor-default' : ''">
+                                    <a :href="currentView === 'home' && !isSorting ? bookmark.url : '#'" :target="currentView === 'home' && !isSorting ? '_blank' : ''" :rel="currentView === 'home' && !isSorting ? 'noopener' : ''" class="flex items-start space-x-3" :class="isSorting ? 'cursor-default' : ''">
                                         <div class="flex-shrink-0 w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 font-bold text-lg uppercase pointer-events-none">
                                             <!-- Privacy note: fetches favicon from Google's service, which receives the bookmark domain. -->
                                         <img :src="'https://www.google.com/s2/favicons?sz=64&domain=' + bookmark.url" class="w-6 h-6" @error="$el.style.display='none'" />
