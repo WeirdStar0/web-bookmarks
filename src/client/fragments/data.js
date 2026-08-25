@@ -6,12 +6,15 @@ init() {
         localStorage.setItem('currentFolderId', JSON.stringify(value));
         this._sidebarDirty = true;
         if (this.loggedIn && this.currentView === 'home' && !this.searchQuery) {
-            this.loadData();
+            void this.loadData();
         }
     });
     this.$watch('currentView', value => {
         localStorage.setItem('currentView', value);
         this.scheduleSearch();
+        if (this.loggedIn && value === 'home' && !this.searchQuery) {
+            void this.loadData();
+        }
     });
     this.$watch('searchQuery', () => this.scheduleSearch());
 },
@@ -59,27 +62,50 @@ async withLoading(fn) {
 
 async loadData() {
     const requestVersion = ++this._dataLoadVersion;
-    const folderQuery = this.currentFolderId ? `?folderId=${encodeURIComponent(this.currentFolderId)}` : '';
-    const res = await this.apiFetch('/api/data' + folderQuery, {
-        shouldHandleUnauthorized: () => requestVersion === this._dataLoadVersion,
-    });
-    let data;
+    const folderId = this.currentFolderId;
+    const isFolderNavigation = this.loggedIn && this.currentView === 'home' && !this.searchQuery;
+    const folderQuery = folderId ? `?folderId=${encodeURIComponent(folderId)}` : '';
+
+    if (isFolderNavigation) this.isFolderLoading = true;
+
     try {
-        data = await res.json();
-    } catch {
-        throw new Error('Invalid data response');
+        const res = await this.apiFetch('/api/data' + folderQuery, {
+            shouldHandleUnauthorized: () => requestVersion === this._dataLoadVersion,
+        });
+        let data;
+        try {
+            data = await res.json();
+        } catch {
+            throw new Error('Invalid data response');
+        }
+        if (!Array.isArray(data?.folders) || !Array.isArray(data?.bookmarks)) {
+            throw new Error('Invalid data response');
+        }
+        if (requestVersion !== this._dataLoadVersion) return false;
+        this.folders = data.folders;
+        this.bookmarks = data.bookmarks;
+        this.bookmarkCounts = data.bookmarkCounts && typeof data.bookmarkCounts === 'object' ? data.bookmarkCounts : {};
+        this.searchResults = null;
+        this.calculateFolderCounts();
+        this._sidebarDirty = true;
+        this._loadedFolderId = folderId;
+        return true;
+    } catch (error) {
+        if (!isFolderNavigation) throw error;
+        if (requestVersion !== this._dataLoadVersion) return false;
+        if (error?.message !== 'Unauthorized') {
+            console.error('Folder data load failed:', error);
+            this.showToast(error?.message || window.translations.toast.networkError, 'error');
+            if (this.currentFolderId === folderId && this.currentFolderId !== this._loadedFolderId) {
+                this.currentFolderId = this._loadedFolderId;
+            }
+        }
+        return false;
+    } finally {
+        if (isFolderNavigation && requestVersion === this._dataLoadVersion) {
+            this.isFolderLoading = false;
+        }
     }
-    if (!Array.isArray(data?.folders) || !Array.isArray(data?.bookmarks)) {
-        throw new Error('Invalid data response');
-    }
-    if (requestVersion !== this._dataLoadVersion) return false;
-    this.folders = data.folders;
-    this.bookmarks = data.bookmarks;
-    this.bookmarkCounts = data.bookmarkCounts && typeof data.bookmarkCounts === 'object' ? data.bookmarkCounts : {};
-    this.searchResults = null;
-    this.calculateFolderCounts();
-    this._sidebarDirty = true;
-    return true;
 },
 
 scheduleSearch() {

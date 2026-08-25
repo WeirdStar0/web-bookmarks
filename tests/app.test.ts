@@ -1959,6 +1959,8 @@ describe('web-bookmarks app', () => {
         expect(source).toContain('window.__WEB_BOOKMARKS_APP_READY__ = true;');
         expect(source).toContain("window.dispatchEvent(new Event('web-bookmarks:app-ready'));");
         expect(source).toContain("window.translations.toast.processing");
+        expect(source).toContain('isFolderLoading');
+        expect(source).toContain('void this.loadData();');
         expect(source).toContain('handleUnauthorized()');
         expect(source).toContain('if (response.status === 401)');
     });
@@ -2007,6 +2009,8 @@ describe('web-bookmarks app', () => {
     it('generated app asset is syntactically valid and fully expanded', () => {
         expect(appAssetSource).not.toContain('__APP_FRAGMENTS_PLACEHOLDER__');
         expect(() => new Function(appAssetSource)).not.toThrow();
+        expect(appAssetSource).toContain('x-show="!isFolderLoading && currentBookmarks.length > 0"');
+        expect(appAssetSource).toContain('role="status"');
     });
 
     it('generated css asset is fully expanded', () => {

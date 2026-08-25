@@ -145,7 +145,8 @@ export const main = (t: TemplateTranslations) => `
             </aside>
 
             <!-- Main Content Area -->
-            <main class="flex-1 flex flex-col overflow-hidden min-h-0 bg-gray-50 dark:bg-gray-900">
+                        <main class="flex-1 flex flex-col overflow-hidden min-h-0 bg-gray-50 dark:bg-gray-900" :aria-busy="isFolderLoading">
+
                 <div class="p-4 sm:p-8 flex-shrink-0">
                 
                 <!-- Breadcrumbs (Home View) -->
@@ -259,8 +260,39 @@ export const main = (t: TemplateTranslations) => `
                         </div>
                     </div>
 
+                                        <!-- Folder Navigation Loading State -->
+                    <div x-show="isFolderLoading && currentView === 'home' && !searchQuery"
+                         x-cloak
+                         role="status"
+                         aria-live="polite"
+                         aria-busy="true"
+                         class="mb-8"
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0"
+                         x-transition:enter-end="opacity-100"
+                         x-transition:leave="transition ease-in duration-150"
+                         x-transition:leave-start="opacity-100"
+                         x-transition:leave-end="opacity-0">
+                        <span class="sr-only">${t.dashboard.loading}</span>
+                        <div class="h-4 w-28 rounded bg-gray-200 dark:bg-gray-700 animate-pulse mb-4" aria-hidden="true"></div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" aria-hidden="true">
+                            <template x-for="placeholder in 4" :key="placeholder">
+                                <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border-2 border-gray-100 dark:border-gray-700">
+                                    <div class="flex items-start space-x-3">
+                                        <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
+                                        <div class="flex-1 min-w-0 space-y-2 pt-1">
+                                            <div class="h-3.5 w-3/4 rounded bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
+                                            <div class="h-3 w-full rounded bg-gray-100 dark:bg-gray-700/80 animate-pulse"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
                     <!-- Bookmarks Grid -->
-                    <div x-show="currentBookmarks.length > 0"
+                    <div x-show="!isFolderLoading && currentBookmarks.length > 0"
+
                          x-transition:enter="transition ease-out duration-300"
                          x-transition:enter-start="opacity-0 transform scale-95"
                          x-transition:enter-end="opacity-100 transform scale-100">
@@ -313,7 +345,8 @@ export const main = (t: TemplateTranslations) => `
                     </div>
 
                     <!-- Empty State -->
-                    <div x-show="currentFolders.length === 0 && currentBookmarks.length === 0" class="flex flex-col items-center justify-center py-20 text-center">
+                                        <div x-show="!isFolderLoading && currentFolders.length === 0 && currentBookmarks.length === 0" class="flex flex-col items-center justify-center py-20 text-center">
+
                         <div class="w-24 h-24 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-6">
                             <svg x-show="currentView === 'home' && !searchQuery" class="w-12 h-12 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
                             <svg x-show="currentView === 'trash'" class="w-12 h-12 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>

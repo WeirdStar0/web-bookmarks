@@ -25,6 +25,7 @@ expandedFolders: {},
 folderCounts: {},
 
 isLoading: false,
+isFolderLoading: false,
 loadingText: '',
 isOperationPending: false,
 mobileMenuOpen: false,
@@ -62,7 +63,9 @@ t: window.translations,
 
 	_sidebarCache: null,
 	_sidebarDirty: true,
-			_dataLoadVersion: 0,
+							_dataLoadVersion: 0,
+				_loadedFolderId: null,
+
 			_trashLoadVersion: 0,
 			_authCheckVersion: 0,
 			_searchRequestVersion: 0,
