@@ -93,7 +93,12 @@ a:focus-visible,
         scroll-behavior: auto !important;
     }
 
+    /* A live loading indicator must remain animated so users can tell that
+       the request is still active; decorative transitions above still reduce. */
     .folder-nav-spinner {
-        animation: none !important;
+        animation: folder-nav-spin 900ms linear infinite !important;
+        animation-duration: 900ms !important;
+        animation-iteration-count: infinite !important;
+        animation-play-state: running !important;
     }
 }

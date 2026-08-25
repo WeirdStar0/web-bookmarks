@@ -2031,6 +2031,8 @@ describe('web-bookmarks app', () => {
         expect(appCssAssetSource).not.toContain('@tailwind');
         expect(appCssAssetSource).toContain('.folder-nav-spinner');
         expect(appCssAssetSource).toContain('@keyframes folder-nav-spin');
+        expect(appCssAssetSource).toContain('animation-iteration-count:infinite');
+        expect(appCssAssetSource).toContain('animation-play-state:running');
     });
 
     it('generated vendor asset is fully expanded', () => {
