@@ -2013,15 +2013,24 @@ describe('web-bookmarks app', () => {
     it('generated app asset is syntactically valid and fully expanded', () => {
         expect(appAssetSource).not.toContain('__APP_FRAGMENTS_PLACEHOLDER__');
         expect(() => new Function(appAssetSource)).not.toThrow();
-        expect(appAssetSource).toContain('x-show="!isFolderLoading && currentBookmarks.length > 0"');
-        expect(appAssetSource).toContain('Folder Navigation Loading Overlay');
+        expect(appAssetSource).toContain('isFolderLoading');
         expect(appAssetSource).toContain('clearFolderLoading()');
-        expect(appAssetSource).toContain('role="status"');
+        expect(appAssetSource).toContain('this._dataLoadVersion++');
+    });
+
+    it('renders unified folder navigation loading feedback', () => {
+        const rendered = main({ ...en, lang: 'en' });
+        expect(rendered).toContain('Folder Navigation Loading Overlay');
+        expect(rendered).toContain('folder-nav-spinner');
+        expect(rendered).toContain('x-transition:enter="folder-nav-transition"');
+        expect(rendered).not.toContain('animate-pulse');
     });
 
     it('generated css asset is fully expanded', () => {
         expect(appCssAssetSource.length).toBeGreaterThan(0);
         expect(appCssAssetSource).not.toContain('@tailwind');
+        expect(appCssAssetSource).toContain('.folder-nav-spinner');
+        expect(appCssAssetSource).toContain('@keyframes folder-nav-spin');
     });
 
     it('generated vendor asset is fully expanded', () => {

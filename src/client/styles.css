@@ -56,6 +56,33 @@ a:focus-visible,
     }
 }
 
+/* Unified folder-navigation motion. Keep the loading indicator independent from utility classes. */
+@keyframes folder-nav-spin {
+    to { transform: rotate(360deg); }
+}
+
+.folder-nav-spinner {
+    display: inline-block;
+    transform-origin: center;
+    animation: folder-nav-spin 900ms linear infinite;
+    will-change: transform;
+}
+
+.folder-nav-transition {
+    transition: opacity 180ms cubic-bezier(0.23, 1, 0.32, 1),
+        transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.folder-nav-start {
+    opacity: 0;
+    transform: translateY(6px);
+}
+
+.folder-nav-end {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -64,5 +91,9 @@ a:focus-visible,
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
         scroll-behavior: auto !important;
+    }
+
+    .folder-nav-spinner {
+        animation: none !important;
     }
 }

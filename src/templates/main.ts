@@ -111,10 +111,11 @@ export const main = (t: TemplateTranslations) => `
 
         <div class="flex flex-1 overflow-hidden relative">
             <!-- Mobile Sidebar Backdrop -->
-            <div x-show="mobileMenuOpen" 
+                        <div x-show="mobileMenuOpen"
                  @click="mobileMenuOpen = false" 
                  class="fixed inset-0 bg-black/50 z-40 md:hidden"
                  x-transition:enter="transition ease-out duration-300"
+
                  x-transition:enter-start="opacity-0"
                  x-transition:enter-end="opacity-100"
                  x-transition:leave="transition ease-in duration-200"
@@ -214,14 +215,14 @@ export const main = (t: TemplateTranslations) => `
                          aria-live="polite"
                          aria-busy="true"
                          class="absolute inset-0 z-10 flex items-start justify-center pt-8 pointer-events-none bg-gray-50/65 dark:bg-gray-900/65 backdrop-blur-[1px]"
-                         x-transition:enter="transition-opacity ease-out duration-150"
-                         x-transition:enter-start="opacity-0"
-                         x-transition:enter-end="opacity-100"
-                         x-transition:leave="transition-opacity ease-in duration-150"
-                         x-transition:leave-start="opacity-100"
-                         x-transition:leave-end="opacity-0">
+                         x-transition:enter="folder-nav-transition"
+                         x-transition:enter-start="folder-nav-start"
+                         x-transition:enter-end="folder-nav-end"
+                         x-transition:leave="folder-nav-transition"
+                         x-transition:leave-start="folder-nav-end"
+                         x-transition:leave-end="folder-nav-start">
                         <div class="flex items-center gap-3 rounded-full bg-white/95 dark:bg-gray-800/95 px-4 py-2.5 shadow-lg ring-1 ring-gray-200 dark:ring-gray-700">
-                            <span class="h-5 w-5 rounded-full border-2 border-blue-200 dark:border-blue-900 border-t-blue-600 dark:border-t-blue-400 animate-spin" aria-hidden="true"></span>
+                            <span class="h-5 w-5 rounded-full border-2 border-blue-200 dark:border-blue-900 border-t-blue-600 dark:border-t-blue-400 folder-nav-spinner" aria-hidden="true"></span>
                             <span class="text-sm font-medium text-gray-700 dark:text-gray-200">${t.dashboard.loading}</span>
                         </div>
                     </div>
@@ -229,9 +230,9 @@ export const main = (t: TemplateTranslations) => `
                     <!-- Folders Grid -->
 
                     <div x-show="currentFolders.length > 0" class="mb-8"
-                         x-transition:enter="transition ease-out duration-300"
-                         x-transition:enter-start="opacity-0 transform scale-95"
-                         x-transition:enter-end="opacity-100 transform scale-100">
+                         x-transition:enter="folder-nav-transition"
+                         x-transition:enter-start="folder-nav-start"
+                         x-transition:enter-end="folder-nav-end">
                         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">${t.dashboard.folders}</h3>
                         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
                              @dragover.prevent="handleDragOver($event, 'folder')"
@@ -287,22 +288,22 @@ export const main = (t: TemplateTranslations) => `
                          aria-live="polite"
                          aria-busy="true"
                          class="mb-8"
-                         x-transition:enter="transition ease-out duration-200"
-                         x-transition:enter-start="opacity-0"
-                         x-transition:enter-end="opacity-100"
-                         x-transition:leave="transition ease-in duration-150"
-                         x-transition:leave-start="opacity-100"
-                         x-transition:leave-end="opacity-0">
+                         x-transition:enter="folder-nav-transition"
+                         x-transition:enter-start="folder-nav-start"
+                         x-transition:enter-end="folder-nav-end"
+                         x-transition:leave="folder-nav-transition"
+                         x-transition:leave-start="folder-nav-end"
+                         x-transition:leave-end="folder-nav-start">
                         <span class="sr-only">${t.dashboard.loading}</span>
-                        <div class="h-4 w-28 rounded bg-gray-200 dark:bg-gray-700 animate-pulse mb-4" aria-hidden="true"></div>
+                        <div class="h-4 w-28 rounded bg-gray-200 dark:bg-gray-700 mb-4" aria-hidden="true"></div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" aria-hidden="true">
                             <template x-for="placeholder in 4" :key="placeholder">
                                 <div class="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border-2 border-gray-100 dark:border-gray-700">
                                     <div class="flex items-start space-x-3">
-                                        <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
+                                        <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gray-200 dark:bg-gray-700"></div>
                                         <div class="flex-1 min-w-0 space-y-2 pt-1">
-                                            <div class="h-3.5 w-3/4 rounded bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
-                                            <div class="h-3 w-full rounded bg-gray-100 dark:bg-gray-700/80 animate-pulse"></div>
+                                            <div class="h-3.5 w-3/4 rounded bg-gray-200 dark:bg-gray-700"></div>
+                                            <div class="h-3 w-full rounded bg-gray-100 dark:bg-gray-700/80"></div>
                                         </div>
                                     </div>
                                 </div>
@@ -313,18 +314,16 @@ export const main = (t: TemplateTranslations) => `
                     <!-- Bookmarks Grid -->
                     <div x-show="!isFolderLoading && currentBookmarks.length > 0"
 
-                         x-transition:enter="transition ease-out duration-300"
-                         x-transition:enter-start="opacity-0 transform scale-95"
-                         x-transition:enter-end="opacity-100 transform scale-100">
+                         x-transition:enter="folder-nav-transition"
+                         x-transition:enter-start="folder-nav-start"
+                         x-transition:enter-end="folder-nav-end">
                         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">${t.dashboard.bookmarks}</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
                              @dragover.prevent="handleDragOver($event, 'bookmark')"
                              @drop="handleDrop($event, 'bookmark')">
                                                                 <template x-for="bookmark in currentBookmarks" :key="bookmark.id">
                                 <div class="group relative bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm hover:shadow-md border-2 border-gray-100 dark:border-gray-700 transition-all duration-200 bookmark-item"
-                                     x-transition:enter="transition ease-out duration-200"
-                                     x-transition:enter-start="opacity-0 transform translate-y-2 scale-95"
-                                     x-transition:enter-end="opacity-100 transform translate-y-0 scale-100"
+
 
                                      :draggable="isSorting && currentView === 'home' && !searchQuery"
                                      @dragstart="handleDragStart($event, bookmark, 'bookmark')"
@@ -393,8 +392,9 @@ export const main = (t: TemplateTranslations) => `
         </div>
 
         <!-- Toast Notification -->
-        <div x-show="toast.show"
+                <div x-show="toast.show"
              x-transition:enter="transition ease-out duration-300"
+
              x-transition:enter-start="opacity-0 transform translate-y-2"
              x-transition:enter-end="opacity-100 transform translate-y-0"
              x-transition:leave="transition ease-in duration-200"
