@@ -81,7 +81,9 @@ async loadData() {
     const isFolderNavigation = this.loggedIn && this.currentView === 'home' && !this.searchQuery;
     const folderQuery = folderId ? `?folderId=${encodeURIComponent(folderId)}` : '';
     const loadingStartedAt = isFolderNavigation ? Date.now() : 0;
-    const minimumLoadingMs = 220;
+    // Keep the indicator visible for a few frames without adding a
+    // noticeable quarter-second delay to fast folder switches.
+    const minimumLoadingMs = 120;
 
     if (isFolderNavigation) this.isFolderLoading = true;
 

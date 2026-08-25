@@ -77,7 +77,6 @@ a:focus-visible,
 
 .loading-overlay {
     background: rgba(8, 15, 30, 0.72);
-    backdrop-filter: blur(4px);
 }
 
 .loading-pill {

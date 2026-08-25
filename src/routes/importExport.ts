@@ -188,19 +188,27 @@ export function registerImportExportRoutes(app: ApiApp) {
             folderId = folder.id;
         }
 
-        const { results: folders } = await c.env.DB.prepare(`SELECT ${FOLDER_PUBLIC_COLUMNS} FROM folders WHERE is_deleted = 0 ORDER BY sort_order ASC, name ASC`).all();
-        const bookmarks = includeBookmarks
-            ? (folderId === null
-                ? (await c.env.DB.prepare(`SELECT ${BOOKMARK_PUBLIC_COLUMNS} FROM bookmarks WHERE is_deleted = 0 AND folder_id IS NULL ORDER BY sort_order ASC, created_at ASC`).all()).results
-                : (await c.env.DB.prepare(`SELECT ${BOOKMARK_PUBLIC_COLUMNS} FROM bookmarks WHERE is_deleted = 0 AND folder_id = ? ORDER BY sort_order ASC, created_at ASC`).bind(folderId).all()).results)
-            : [];
-        const bookmarkCounts: Record<string, number> = {};
-        if (includeBookmarks) {
-            const { results: countRows } = await c.env.DB.prepare(
-                'SELECT folder_id, COUNT(*) AS count FROM bookmarks WHERE is_deleted = 0 AND folder_id IS NOT NULL GROUP BY folder_id'
-            ).all<{ folder_id: number; count: number }>();
-            for (const row of countRows) bookmarkCounts[String(row.folder_id)] = Number(row.count);
+        const foldersPromise = c.env.DB.prepare(`SELECT ${FOLDER_PUBLIC_COLUMNS} FROM folders WHERE is_deleted = 0 ORDER BY sort_order ASC, name ASC`).all();
+        if (!includeBookmarks) {
+            const { results: folders } = await foldersPromise;
+            return c.json({ folders, bookmarks: [], bookmarkCounts: {} });
         }
+
+        const bookmarksPromise = folderId === null
+            ? c.env.DB.prepare(`SELECT ${BOOKMARK_PUBLIC_COLUMNS} FROM bookmarks WHERE is_deleted = 0 AND folder_id IS NULL ORDER BY sort_order ASC, created_at ASC`).all()
+            : c.env.DB.prepare(`SELECT ${BOOKMARK_PUBLIC_COLUMNS} FROM bookmarks WHERE is_deleted = 0 AND folder_id = ? ORDER BY sort_order ASC, created_at ASC`).bind(folderId).all();
+        const bookmarkCountsPromise = c.env.DB.prepare(
+            'SELECT folder_id, COUNT(*) AS count FROM bookmarks WHERE is_deleted = 0 AND folder_id IS NOT NULL GROUP BY folder_id'
+        ).all<{ folder_id: number; count: number }>();
+
+        const [
+            { results: folders },
+            { results: bookmarks },
+            { results: countRows },
+        ] = await Promise.all([foldersPromise, bookmarksPromise, bookmarkCountsPromise]);
+
+        const bookmarkCounts: Record<string, number> = {};
+        for (const row of countRows) bookmarkCounts[String(row.folder_id)] = Number(row.count);
         return c.json({ folders, bookmarks, bookmarkCounts });
     });
 
