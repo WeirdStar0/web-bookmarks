@@ -106,5 +106,80 @@
     },
     "unknownError": {
         "message": "未知錯誤"
+    },
+    "pendingSyncFull": {
+        "message": "待同步佇列已滿。請恢復連線並完成同步後再新增書籤。"
+    },
+    "pendingSyncWaiting": {
+        "message": "書籤正在等待同步。"
+    },
+    "pendingSyncRemaining": {
+        "message": "仍有書籤等待同步。"
+    },
+    "sessionExpiredSync": {
+        "message": "登入已過期。請重新登入以同步待處理書籤。"
+    },
+    "syncFailed": {
+        "message": "同步失敗"
+    },
+    "serverLoginProtectionMissing": {
+        "message": "伺服器未設定登入保護。請聯絡伺服器管理員。"
+    },
+    "sessionExpired": {
+        "message": "登入已過期，請重新登入。"
+    },
+    "pendingSaveQueued": {
+        "message": "已儲存到待同步佇列，網路恢復後將安全重試。"
+    },
+    "minSearchChars": {
+        "message": "至少輸入 2 個字元後再搜尋。"
+    },
+    "searching": {
+        "message": "正在搜尋…"
+    },
+    "searchFailed": {
+        "message": "搜尋失敗，請重試。"
+    },
+    "searchOffline": {
+        "message": "離線時無法搜尋，請檢查網路連線。"
+    },
+    "toggleSubfolders": {
+        "message": "展開或摺疊子資料夾"
+    },
+    "retryPendingSaves": {
+        "message": "立即重試待同步書籤"
+    },
+    "syncRetrying": {
+        "message": "正在重試待同步書籤…"
+    },
+    "offlineCachedMode": {
+        "message": "離線模式：可使用快取資料夾，新書籤將加入待同步佇列。"
+    },
+    "extensionOrigin": {
+        "message": "擴充功能 Origin"
+    },
+    "copyExtensionOrigin": {
+        "message": "複製"
+    },
+    "extensionOriginDesc": {
+        "message": "將此 Origin 加入 Worker 的 ALLOWED_EXTENSION_ORIGINS 後重新部署，才能安全連接目前安裝的擴充功能。"
+    },
+    "extensionOriginCopied": {
+        "message": "擴充功能 Origin 已複製。請加入 Worker 白名單並重新部署。"
+    },
+    "extensionOriginCopyFailed": {
+        "message": "無法複製擴充功能 Origin，請手動選取並複製。"
+    },
+    "pendingStorageFailed": {
+        "message": "無法在本機儲存待同步書籤。請保持此視窗開啟後重試。"
+    },
+    "pendingSavesTitle": {
+        "message": "待同步書籤"
+    },
+    "pendingSaveWaiting": {
+        "message": "等待同步"
+    },
+    "removePendingSave": {
+        "message": "移除"
     }
 }

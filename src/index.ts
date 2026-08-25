@@ -73,7 +73,7 @@ app.use('/api/*', cors({
     },
     credentials: true,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
 }));
 app.use('/api/*', async (c, next) => {
     const origin = c.req.header('Origin');
@@ -97,7 +97,7 @@ app.use('*', secureHeaders({
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-eval'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", "data:", "https://www.google.com", "https://*.gstatic.com"],
+        imgSrc: ["'self'", "data:"],
         connectSrc: ["'self'"],
         frameSrc: ["'none'"],
         objectSrc: ["'none'"],
@@ -106,7 +106,10 @@ app.use('*', secureHeaders({
 
 // Global Error Handler
 app.onError((err, c) => {
-    const status = (err as HTTPException).status || 500;
+    // Hono surfaces malformed request JSON as a SyntaxError. Treat it as a
+    // client validation failure rather than reporting a misleading 500.
+    const isMalformedJson = err instanceof SyntaxError || err.name === 'SyntaxError';
+    const status = isMalformedJson ? 400 : (err as HTTPException).status || 500;
     if (status >= 500) {
         console.error(`[Global Error]: ${err.stack || err.message}`);
     } else {
@@ -120,8 +123,14 @@ app.onError((err, c) => {
     if (cookieLang === 'en') isEn = true;
     if (cookieLang === 'zh') isEn = false;
 
-    const message = isEn ? 'Server Error, please try again later' : '服务器繁忙，请稍后再试';
+    if (isMalformedJson) {
+        return c.json({
+            error: ErrCode.VALIDATION,
+            message: isEn ? 'Invalid JSON request body' : '请求 JSON 格式无效',
+        }, 400);
+    }
 
+    const message = isEn ? 'Server Error, please try again later' : '服务器繁忙，请稍后再试';
     return c.json({
         error: 'Internal Server Error',
         message: message

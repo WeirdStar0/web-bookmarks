@@ -106,5 +106,80 @@
     },
     "unknownError": {
         "message": "Error desconocido"
+    },
+    "pendingSyncFull": {
+        "message": "La cola de sincronización está llena. Restablece la conexión e inténtalo de nuevo."
+    },
+    "pendingSyncWaiting": {
+        "message": "Hay marcadores esperando sincronización."
+    },
+    "pendingSyncRemaining": {
+        "message": "Aún hay marcadores esperando sincronización."
+    },
+    "sessionExpiredSync": {
+        "message": "La sesión ha caducado. Inicia sesión de nuevo para sincronizar los marcadores pendientes."
+    },
+    "syncFailed": {
+        "message": "Error de sincronización"
+    },
+    "serverLoginProtectionMissing": {
+        "message": "La protección de inicio de sesión del servidor no está configurada. Contacta al administrador."
+    },
+    "sessionExpired": {
+        "message": "La sesión ha caducado. Inicia sesión de nuevo."
+    },
+    "pendingSaveQueued": {
+        "message": "Guardado para un reintento seguro cuando vuelva la conexión."
+    },
+    "minSearchChars": {
+        "message": "Introduce al menos 2 caracteres para buscar."
+    },
+    "searching": {
+        "message": "Buscando…"
+    },
+    "searchFailed": {
+        "message": "La búsqueda falló. Inténtalo de nuevo."
+    },
+    "searchOffline": {
+        "message": "No se puede buscar sin conexión. Comprueba tu red."
+    },
+    "toggleSubfolders": {
+        "message": "Expandir o contraer subcarpetas"
+    },
+    "retryPendingSaves": {
+        "message": "Reintentar ahora los marcadores pendientes"
+    },
+    "syncRetrying": {
+        "message": "Reintentando los marcadores pendientes…"
+    },
+    "offlineCachedMode": {
+        "message": "Modo sin conexión: las carpetas en caché están disponibles y los marcadores nuevos se pondrán en cola."
+    },
+    "extensionOrigin": {
+        "message": "Origen de la extensión"
+    },
+    "copyExtensionOrigin": {
+        "message": "Copiar"
+    },
+    "extensionOriginDesc": {
+        "message": "Añade este origen a ALLOWED_EXTENSION_ORIGINS del Worker y vuelve a desplegar para conectar esta instalación de forma segura."
+    },
+    "extensionOriginCopied": {
+        "message": "Origen de la extensión copiado. Añádelo a la lista permitida del Worker y vuelve a desplegar."
+    },
+    "extensionOriginCopyFailed": {
+        "message": "No se pudo copiar el origen de la extensión. Selecciónalo y cópialo manualmente."
+    },
+    "pendingStorageFailed": {
+        "message": "No se pudo guardar el marcador pendiente localmente. Mantén esta ventana abierta e inténtalo de nuevo."
+    },
+    "pendingSavesTitle": {
+        "message": "Marcadores pendientes"
+    },
+    "pendingSaveWaiting": {
+        "message": "Esperando sincronización"
+    },
+    "removePendingSave": {
+        "message": "Eliminar"
     }
 }

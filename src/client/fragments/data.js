@@ -2,24 +2,45 @@ init() {
     if (this.darkMode) document.documentElement.classList.add('dark');
     this.checkAuth();
 
-    this.$watch('currentFolderId', value => { localStorage.setItem('currentFolderId', JSON.stringify(value)); this._sidebarDirty = true; });
-    this.$watch('currentView', value => localStorage.setItem('currentView', value));
+    this.$watch('currentFolderId', value => {
+        localStorage.setItem('currentFolderId', JSON.stringify(value));
+        this._sidebarDirty = true;
+        if (this.loggedIn && this.currentView === 'home' && !this.searchQuery) {
+            this.loadData();
+        }
+    });
+    this.$watch('currentView', value => {
+        localStorage.setItem('currentView', value);
+        this.scheduleSearch();
+    });
+    this.$watch('searchQuery', () => this.scheduleSearch());
 },
 
 async checkAuth() {
+    const authCheckVersion = ++this._authCheckVersion;
+    const wasLoggedIn = this.loggedIn;
     try {
         await this.loadData();
         if (this.currentView === 'trash') {
             await this.loadTrash();
         }
+        if (authCheckVersion !== this._authCheckVersion) return;
         this.loggedIn = true;
     } catch (e) {
-        this.loggedIn = false;
-        if (e.message !== 'Unauthorized') {
+        // A 401 is a definitive session transition only for the newest auth
+        // check. A stale load may throw after apiFetch intentionally declined
+        // to clear a fresher session, so it must not change UI state here.
+        if (authCheckVersion !== this._authCheckVersion) return;
+        if (e.message === 'Unauthorized') {
+            this.loggedIn = false;
+        } else {
+            if (!wasLoggedIn) this.loggedIn = false;
             console.error('Auth check failed:', e);
         }
     } finally {
-        this.isCheckingAuth = false;
+        if (authCheckVersion === this._authCheckVersion) {
+            this.isCheckingAuth = false;
+        }
     }
 },
 
@@ -37,16 +58,74 @@ async withLoading(fn) {
 },
 
 async loadData() {
-    const res = await fetch('/api/data');
-    if (res.status === 401) throw new Error('Unauthorized');
-    if (!res.ok) {
-        throw new Error('Load data failed with status: ' + res.status);
+    const requestVersion = ++this._dataLoadVersion;
+    const folderQuery = this.currentFolderId ? `?folderId=${encodeURIComponent(this.currentFolderId)}` : '';
+    const res = await this.apiFetch('/api/data' + folderQuery, {
+        shouldHandleUnauthorized: () => requestVersion === this._dataLoadVersion,
+    });
+    let data;
+    try {
+        data = await res.json();
+    } catch {
+        throw new Error('Invalid data response');
     }
-    const data = await res.json();
+    if (!Array.isArray(data?.folders) || !Array.isArray(data?.bookmarks)) {
+        throw new Error('Invalid data response');
+    }
+    if (requestVersion !== this._dataLoadVersion) return false;
     this.folders = data.folders;
     this.bookmarks = data.bookmarks;
+    this.bookmarkCounts = data.bookmarkCounts && typeof data.bookmarkCounts === 'object' ? data.bookmarkCounts : {};
+    this.searchResults = null;
     this.calculateFolderCounts();
     this._sidebarDirty = true;
+    return true;
+},
+
+scheduleSearch() {
+    if (this._searchTimer) {
+        clearTimeout(this._searchTimer);
+        this._searchTimer = null;
+    }
+
+    const query = this.searchQuery.trim();
+    this.searchResults = null;
+    if (!query || this.currentView === 'trash') {
+        this.searchPending = false;
+        this._searchRequestVersion++;
+        return;
+    }
+
+    this.searchPending = true;
+    const requestVersion = ++this._searchRequestVersion;
+    this._searchTimer = setTimeout(() => {
+        this.loadSearchResults(query, requestVersion);
+    }, 250);
+},
+
+async loadSearchResults(query, requestVersion) {
+    try {
+        const res = await this.apiFetch('/api/search?q=' + encodeURIComponent(query), {
+            shouldHandleUnauthorized: () => requestVersion === this._searchRequestVersion,
+        });
+        const data = await res.json();
+        if (!Array.isArray(data?.folders) || !Array.isArray(data?.bookmarks)) {
+            throw new Error('Invalid search response');
+        }
+        if (requestVersion !== this._searchRequestVersion || query !== this.searchQuery.trim()) return;
+        this.searchResults = { folders: data.folders, bookmarks: data.bookmarks };
+    } catch (error) {
+        if (requestVersion !== this._searchRequestVersion) return;
+        if (error.message !== 'Unauthorized') {
+            console.error('Search failed:', error);
+            this.showToast(error.message || window.translations.toast.networkError, 'error');
+        }
+    } finally {
+        if (requestVersion === this._searchRequestVersion) {
+            this.searchPending = false;
+            this._searchTimer = null;
+        }
+    }
 },
 
 calculateFolderCounts() {
@@ -58,31 +137,57 @@ calculateFolderCounts() {
         if (!childrenMap[pid]) childrenMap[pid] = [];
         childrenMap[pid].push(f.id);
     });
-    // Count direct bookmarks per folder
-    const directCounts = {};
+    // The API returns direct counts for the whole library even when the
+    // current folder's bookmark list is loaded lazily.
+    const directCounts = { ...this.bookmarkCounts };
     this.bookmarks.forEach(b => {
         if (!b.is_deleted && b.folder_id) {
-            directCounts[b.folder_id] = (directCounts[b.folder_id] || 0) + 1;
+            const key = String(b.folder_id);
+            if (!Object.prototype.hasOwnProperty.call(directCounts, key)) {
+                directCounts[key] = (directCounts[key] || 0) + 1;
+            }
         }
     });
-    // Recursively sum children bookmarks
-    const computeTotal = (folderId) => {
-        let total = directCounts[folderId] || 0;
+    // Memoize subtree totals so each folder is evaluated at most once. The
+    // visited set also prevents a legacy/corrupted cyclic hierarchy from
+    // causing unbounded client-side recursion.
+    const computeTotal = (folderId, visiting = new Set()) => {
+        if (Object.prototype.hasOwnProperty.call(this.folderCounts, folderId)) {
+            return this.folderCounts[folderId];
+        }
+        if (visiting.has(folderId)) return 0;
+
+        visiting.add(folderId);
+        let total = directCounts[String(folderId)] || 0;
         const children = childrenMap[folderId] || [];
         for (const childId of children) {
-            total += computeTotal(childId);
+            total += computeTotal(childId, visiting);
         }
+        visiting.delete(folderId);
+        this.folderCounts[folderId] = total;
         return total;
     };
     this.folders.forEach(f => {
-        this.folderCounts[f.id] = computeTotal(f.id);
+        computeTotal(f.id);
     });
 },
 
 async loadTrash() {
-    const res = await fetch('/api/trash');
-    if (res.status === 401) throw new Error('Unauthorized');
-    const data = await res.json();
+    const requestVersion = ++this._trashLoadVersion;
+    const res = await this.apiFetch('/api/trash', {
+        shouldHandleUnauthorized: () => requestVersion === this._trashLoadVersion,
+    });
+    let data;
+    try {
+        data = await res.json();
+    } catch {
+        throw new Error('Invalid trash response');
+    }
+    if (!Array.isArray(data?.folders) || !Array.isArray(data?.bookmarks)) {
+        throw new Error('Invalid trash response');
+    }
+    if (requestVersion !== this._trashLoadVersion) return false;
     this.trashFolders = data.folders;
     this.trashBookmarks = data.bookmarks;
+    return true;
 }

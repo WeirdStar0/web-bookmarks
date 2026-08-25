@@ -106,5 +106,80 @@
     },
     "unknownError": {
         "message": "未知错误"
+    },
+    "pendingSyncFull": {
+        "message": "待同步队列已满。请恢复连接并完成同步后再添加书签。"
+    },
+    "pendingSyncWaiting": {
+        "message": "书签正在等待同步。"
+    },
+    "pendingSyncRemaining": {
+        "message": "仍有书签等待同步。"
+    },
+    "sessionExpiredSync": {
+        "message": "登录已过期。请重新登录以同步待处理书签。"
+    },
+    "syncFailed": {
+        "message": "同步失败"
+    },
+    "serverLoginProtectionMissing": {
+        "message": "服务器未配置登录保护。请联系服务器管理员。"
+    },
+    "sessionExpired": {
+        "message": "登录已过期，请重新登录。"
+    },
+    "pendingSaveQueued": {
+        "message": "已保存到待同步队列，网络恢复后将安全重试。"
+    },
+    "minSearchChars": {
+        "message": "至少输入 2 个字符后再搜索。"
+    },
+    "searching": {
+        "message": "正在搜索…"
+    },
+    "searchFailed": {
+        "message": "搜索失败，请重试。"
+    },
+    "searchOffline": {
+        "message": "离线时无法搜索，请检查网络连接。"
+    },
+    "toggleSubfolders": {
+        "message": "展开或折叠子文件夹"
+    },
+    "retryPendingSaves": {
+        "message": "立即重试待同步书签"
+    },
+    "syncRetrying": {
+        "message": "正在重试待同步书签…"
+    },
+    "offlineCachedMode": {
+        "message": "离线模式：可使用缓存文件夹，新书签将加入待同步队列。"
+    },
+    "extensionOrigin": {
+        "message": "扩展 Origin"
+    },
+    "copyExtensionOrigin": {
+        "message": "复制"
+    },
+    "extensionOriginDesc": {
+        "message": "将此 Origin 加入 Worker 的 ALLOWED_EXTENSION_ORIGINS 后重新部署，才能安全连接当前安装的扩展。"
+    },
+    "extensionOriginCopied": {
+        "message": "扩展 Origin 已复制。请加入 Worker 白名单并重新部署。"
+    },
+    "extensionOriginCopyFailed": {
+        "message": "无法复制扩展 Origin，请手动选中并复制。"
+    },
+    "pendingStorageFailed": {
+        "message": "无法在本地保存待同步书签。请保持此窗口打开后重试。"
+    },
+    "pendingSavesTitle": {
+        "message": "待同步书签"
+    },
+    "pendingSaveWaiting": {
+        "message": "等待同步"
+    },
+    "removePendingSave": {
+        "message": "移除"
     }
 }

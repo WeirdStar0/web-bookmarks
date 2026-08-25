@@ -1,5 +1,12 @@
 import type { TemplateTranslations } from './types';
 
+const alpineString = (value: string) => JSON.stringify(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 export const main = (t: TemplateTranslations) => `
     <!-- Main Content -->
     <div x-show="loggedIn" class="h-screen flex flex-col" x-cloak>
@@ -230,20 +237,20 @@ export const main = (t: TemplateTranslations) => `
 
                                     <!-- Home View Actions -->
                                     <div x-show="currentView === 'home' && !isSorting" class="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-all">
-                                        <button @click.stop="openFolderModal(folder)" class="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full" title="${t.dashboard.rename}">
+                                        <button @click.stop="openFolderModal(folder)" class="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full" aria-label="${t.dashboard.rename}" title="${t.dashboard.rename}">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                         </button>
-                                        <button @click.stop="deleteFolder(folder.id)" class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full" title="${t.dashboard.delete}">
+                                        <button @click.stop="deleteFolder(folder.id)" class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full" aria-label="${t.dashboard.delete}" title="${t.dashboard.delete}">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         </button>
                                     </div>
 
                                     <!-- Trash View Actions -->
                                     <div x-show="currentView === 'trash'" class="absolute inset-0 bg-black bg-opacity-50 rounded-xl flex items-center justify-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                                        <button @click.stop="restoreFolder(folder.id)" class="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors" title="${t.dashboard.restore}">
+                                        <button @click.stop="restoreFolder(folder.id)" class="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors" aria-label="${t.dashboard.restore}" title="${t.dashboard.restore}">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                                         </button>
-                                        <button @click.stop="permanentDeleteFolder(folder.id)" class="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors" title="${t.dashboard.permanentDelete}">
+                                        <button @click.stop="permanentDeleteFolder(folder.id)" class="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors" aria-label="${t.dashboard.permanentDelete}" title="${t.dashboard.permanentDelete}">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         </button>
                                     </div>
@@ -273,9 +280,7 @@ export const main = (t: TemplateTranslations) => `
                                      }">
                                     <a :href="currentView === 'home' && !isSorting ? bookmark.url : '#'" :target="currentView === 'home' && !isSorting ? '_blank' : ''" :rel="currentView === 'home' && !isSorting ? 'noopener' : ''" class="flex items-start space-x-3" :class="isSorting ? 'cursor-default' : ''">
                                         <div class="flex-shrink-0 w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 font-bold text-lg uppercase pointer-events-none">
-                                            <!-- Privacy note: fetches favicon from Google's service, which receives the bookmark domain. -->
-                                        <img :src="'https://www.google.com/s2/favicons?sz=64&domain=' + bookmark.url" class="w-6 h-6" @error="$el.style.display='none'" />
-                                            <span x-show="!$el.previousElementSibling || $el.previousElementSibling.style.display === 'none'" x-text="bookmark.title.charAt(0)"></span>
+                                            <span x-text="bookmark.title.charAt(0)"></span>
                                         </div>
                                         <div class="flex-1 min-w-0 pr-16 pointer-events-none">
                                             <h3 class="text-sm font-medium text-gray-900 dark:text-gray-200 truncate" x-text="bookmark.title"></h3>
@@ -285,20 +290,20 @@ export const main = (t: TemplateTranslations) => `
 
                                     <!-- Home View Actions -->
                                     <div x-show="currentView === 'home' && !isSorting" class="absolute top-3 right-3 flex space-x-1 opacity-0 group-hover:opacity-100 transition-all">
-                                        <button @click.prevent="openBookmarkModal(bookmark)" class="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full" title="${t.dashboard.rename}">
+                                        <button @click.prevent="openBookmarkModal(bookmark)" class="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full" aria-label="${t.dashboard.rename}" title="${t.dashboard.rename}">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                                         </button>
-                                        <button @click.prevent="deleteBookmark(bookmark.id)" class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full" title="${t.dashboard.delete}">
+                                        <button @click.prevent="deleteBookmark(bookmark.id)" class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full" aria-label="${t.dashboard.delete}" title="${t.dashboard.delete}">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         </button>
                                     </div>
 
                                     <!-- Trash View Actions -->
                                     <div x-show="currentView === 'trash'" class="absolute inset-0 bg-black bg-opacity-50 rounded-xl flex items-center justify-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm">
-                                        <button @click.stop="restoreBookmark(bookmark.id)" class="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors" title="${t.dashboard.restore}">
+                                        <button @click.stop="restoreBookmark(bookmark.id)" class="p-2 bg-green-500 text-white rounded-full hover:bg-green-600 transition-colors" aria-label="${t.dashboard.restore}" title="${t.dashboard.restore}">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                                         </button>
-                                        <button @click.stop="permanentDeleteBookmark(bookmark.id)" class="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors" title="${t.dashboard.permanentDelete}">
+                                        <button @click.stop="permanentDeleteBookmark(bookmark.id)" class="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors" aria-label="${t.dashboard.permanentDelete}" title="${t.dashboard.permanentDelete}">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                                         </button>
                                     </div>
@@ -314,8 +319,8 @@ export const main = (t: TemplateTranslations) => `
                             <svg x-show="currentView === 'trash'" class="w-12 h-12 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                             <svg x-show="searchQuery" class="w-12 h-12 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                         </div>
-                        <h3 class="text-xl font-medium text-gray-900 dark:text-gray-200 mb-2" x-text="currentView === 'trash' ? '${t.dashboard.emptyTrashTitle}' : (searchQuery ? '${t.dashboard.notFoundTitle}' : '${t.dashboard.emptyHomeTitle}')"></h3>
-                        <p class="text-gray-500 dark:text-gray-400 max-w-sm mx-auto mb-8" x-text="currentView === 'trash' ? '${t.dashboard.emptyTrashDesc}' : (searchQuery ? '${t.dashboard.notFoundDesc}' : '${t.dashboard.emptyHomeDesc}')"></p>
+                        <h3 class="text-xl font-medium text-gray-900 dark:text-gray-200 mb-2" x-text="currentView === 'trash' ? ${alpineString(t.dashboard.emptyTrashTitle)} : (searchQuery ? ${alpineString(t.dashboard.notFoundTitle)} : ${alpineString(t.dashboard.emptyHomeTitle)})"></h3>
+                        <p class="text-gray-500 dark:text-gray-400 max-w-sm mx-auto mb-8" x-text="currentView === 'trash' ? ${alpineString(t.dashboard.emptyTrashDesc)} : (searchQuery ? ${alpineString(t.dashboard.notFoundDesc)} : ${alpineString(t.dashboard.emptyHomeDesc)})"></p>
                         <div class="flex space-x-4" x-show="currentView === 'home' && !searchQuery">
                             <button @click="openFolderModal()" :disabled="isOperationPending || isSorting" :class="{'opacity-50 cursor-not-allowed': isOperationPending || isSorting}" class="px-6 py-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors">
                                 ${t.dashboard.newFolder}

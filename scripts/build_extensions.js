@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
+const PACKAGE_VERSION = require(path.join(ROOT_DIR, 'package.json')).version;
 const EXT_DIR = path.join(ROOT_DIR, 'extension');
 const DIST_DIR = path.join(ROOT_DIR, 'dist_extensions');
 
@@ -61,7 +62,10 @@ async function build() {
         const manifestPath = path.join(targetDir, 'manifest.json');
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 
-        // Merge updates
+        // Keep every browser artifact aligned to the package release version.
+        manifest.version = PACKAGE_VERSION;
+
+        // Merge browser-specific updates.
         Object.assign(manifest, config.manifestUpdates);
 
         // Firefox specific: remove background service worker if present (not fully supported the same way in all versions or conflicts)

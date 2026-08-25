@@ -31,9 +31,60 @@
     transition: background-color 0.2s, border-color 0.2s, color 0.1s;
 }
 
+.origin-pairing-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.origin-value {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-main);
+    color: var(--text-main);
+    font-size: 11px;
+    overflow-wrap: anywhere;
+}
+
+.origin-pairing-row .btn-secondary {
+    width: auto;
+    margin-top: 0;
+    padding: 8px 10px;
+    flex-shrink: 0;
+}
+
+.origin-pairing-help {
+    margin-top: 6px;
+    color: var(--text-dim);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+button:focus-visible,
+[role="treeitem"]:focus-visible,
+.select-trigger:focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
+}
+
 body {
     margin: 0;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans CJK SC", sans-serif;
     font-size: 14px;
     line-height: 1.5;
     color: var(--text-main);
@@ -250,6 +301,11 @@ input:read-only {
     background: var(--primary-hover);
 }
 
+.btn-primary:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
 .btn-primary:active {
     transform: translateY(1px);
 }
@@ -268,6 +324,76 @@ input:read-only {
 
 .btn-secondary:hover {
     background: var(--bg-main);
+}
+
+.pending-saves {
+    margin: 0 0 12px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background: var(--bg-main);
+}
+
+.pending-saves h3 {
+    margin: 0 0 8px;
+    color: var(--text-main);
+    font-size: 12px;
+}
+
+.pending-saves-list {
+    display: grid;
+    gap: 8px;
+    max-height: 130px;
+    overflow-y: auto;
+}
+
+.pending-save-item {
+    padding: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-card);
+}
+
+.pending-save-item strong,
+.pending-save-url,
+.pending-save-detail,
+.pending-save-error {
+    display: block;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.pending-save-item strong {
+    color: var(--text-main);
+    font-size: 12px;
+}
+
+.pending-save-url,
+.pending-save-detail,
+.pending-save-error {
+    margin-top: 3px;
+    font-size: 11px;
+}
+
+.pending-save-url,
+.pending-save-detail {
+    color: var(--text-dim);
+}
+
+.pending-save-error {
+    color: #dc2626;
+}
+
+.pending-save-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.pending-save-actions .btn-secondary {
+    width: auto;
+    margin-top: 6px;
+    padding: 5px 8px;
+    font-size: 11px;
 }
 
 /* Search Results */
@@ -382,6 +508,16 @@ input:read-only {
     color: #dc2626;
 }
 
+.sync-info {
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+.sync-error {
+    background: rgba(239, 68, 68, 0.1);
+    color: #dc2626;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
     width: 5px;
@@ -475,6 +611,9 @@ input:read-only {
 .folder-toggle {
     width: 20px;
     height: 20px;
+    border: 0;
+    padding: 0;
+    background: transparent;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -529,4 +668,26 @@ input:read-only {
 
 .folder-children.hidden {
     display: none;
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+button:active:not(:disabled),
+.btn-primary:active:not(:disabled),
+.btn-secondary:active:not(:disabled) {
+    transform: scale(0.98);
+}
+
+[aria-hidden="true"] {
+    pointer-events: none;
 }

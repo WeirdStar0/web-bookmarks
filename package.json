@@ -4,14 +4,14 @@
   "description": "现代化书签管理系统 - 基于 Cloudflare Workers 和 D1",
   "main": "index.js",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.13.0 <23"
   },
   "scripts": {
     "build:app-asset": "node scripts/build_app_asset.js",
     "build:app-css": "node scripts/build_app_css.js",
     "build:vendor-asset": "node scripts/build_vendor_asset.js",
     "build": "npm run build:app-asset && npm run build:app-css && npm run build:vendor-asset && tsc --noEmit",
-    "check": "npm run build && npm run lint && npm test",
+    "check": "npm run build && npm run lint && npm test && npm run check:migrations && npm run test:deploy-config && npm run check:extension",
     "dev": "wrangler dev src/index.ts",
     "predev": "npm run build:app-asset && npm run build:app-css && npm run build:vendor-asset",
     "db:init:local": "wrangler d1 execute bookmarks-db --local --file=./schema.sql",
@@ -20,10 +20,15 @@
     "db:migrate:local": "wrangler d1 migrations apply bookmarks-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply bookmarks-db --remote",
     "db:migrate": "echo \"ℹ️ 使用 'npm run db:migrate:local' 升级本地库，使用 'npm run db:migrate:remote' 升级远程库。\"",
+    "deploy:check": "npm run check:migrations && node scripts/check_production_config.js && node scripts/check_remote_d1_migrations.js",
+    "test:deploy-config": "node scripts/test_production_config.js",
     "deploy": "wrangler deploy",
-    "predeploy": "npm run check",
-    "lint": "eslint \"src/**/*.ts\"",
+    "predeploy": "npm run check && npm run deploy:check",
+    "lint": "eslint \"src/**/*.ts\" \"extension/*.js\"",
+    "check:migrations": "node scripts/check_migration_files.js",
+    "i18n:extension": "node scripts/sync_extension_locale_keys.js",
     "build:ext": "node scripts/build_extensions.js",
+    "check:extension": "npm run build:ext && node scripts/check_extension.js",
     "pretest": "npm run build:app-asset && npm run build:app-css && npm run build:vendor-asset",
     "test": "vitest run"
   },
@@ -37,7 +42,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "hono": "^4.10.6",
+    "hono": "^4.13.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {

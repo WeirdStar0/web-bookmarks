@@ -106,5 +106,80 @@
     },
     "unknownError": {
         "message": "Unknown error"
+    },
+    "pendingSyncFull": {
+        "message": "Pending sync queue is full. Reconnect and retry before adding more bookmarks."
+    },
+    "pendingSyncWaiting": {
+        "message": "Bookmarks are waiting to sync."
+    },
+    "pendingSyncRemaining": {
+        "message": "Some bookmarks are still waiting to sync."
+    },
+    "sessionExpiredSync": {
+        "message": "Session expired. Please sign in again to sync pending bookmarks."
+    },
+    "syncFailed": {
+        "message": "Sync failed"
+    },
+    "serverLoginProtectionMissing": {
+        "message": "The server login protection is not configured. Contact the server administrator."
+    },
+    "sessionExpired": {
+        "message": "Session expired. Please sign in again."
+    },
+    "pendingSaveQueued": {
+        "message": "Saved for secure retry when the connection returns."
+    },
+    "minSearchChars": {
+        "message": "Enter at least 2 characters to search."
+    },
+    "searching": {
+        "message": "Searching…"
+    },
+    "searchFailed": {
+        "message": "Search failed. Please try again."
+    },
+    "searchOffline": {
+        "message": "Unable to search while offline. Please check your connection."
+    },
+    "toggleSubfolders": {
+        "message": "Toggle subfolders"
+    },
+    "retryPendingSaves": {
+        "message": "Retry pending bookmarks now"
+    },
+    "syncRetrying": {
+        "message": "Retrying pending bookmarks…"
+    },
+    "offlineCachedMode": {
+        "message": "Offline mode: cached folders are available and new bookmarks will be queued."
+    },
+    "extensionOrigin": {
+        "message": "Extension origin"
+    },
+    "copyExtensionOrigin": {
+        "message": "Copy"
+    },
+    "extensionOriginDesc": {
+        "message": "Add this origin to the Worker ALLOWED_EXTENSION_ORIGINS setting and redeploy to safely connect this extension installation."
+    },
+    "extensionOriginCopied": {
+        "message": "Extension origin copied. Add it to the Worker allowlist and redeploy."
+    },
+    "extensionOriginCopyFailed": {
+        "message": "Could not copy the extension origin. Select and copy it manually."
+    },
+    "pendingStorageFailed": {
+        "message": "Could not save the pending bookmark locally. Keep this window open and try again."
+    },
+    "pendingSavesTitle": {
+        "message": "Pending bookmarks"
+    },
+    "pendingSaveWaiting": {
+        "message": "Waiting to sync"
+    },
+    "removePendingSave": {
+        "message": "Remove"
     }
 }

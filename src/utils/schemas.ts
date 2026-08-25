@@ -13,12 +13,22 @@ const httpUrlSchema = z.string().url().max(2048).refine((value) => {
 
 export const loginSchema = z.object({
     username: z.string().min(3).max(100).regex(/^[a-zA-Z0-9_-]+$/),
+    // Permit older credentials to authenticate so they can be migrated. New
+    // password assignments are guarded by the stricter settings schema below.
     password: z.string().min(6).max(100),
 });
 
 export const settingsSchema = z.object({
-    username: z.string().min(3).max(100).regex(/^[a-zA-Z0-9_-]+$/).optional(),
-    password: z.string().min(6).max(100).optional(),
+    // The settings form keeps both controls in the payload. Treat an empty
+    // control as "leave unchanged" instead of validating it as a credential.
+    username: z.preprocess(
+        (value) => value === '' ? undefined : value,
+        z.string().min(3).max(100).regex(/^[a-zA-Z0-9_-]+$/).optional(),
+    ),
+    password: z.preprocess(
+        (value) => value === '' ? undefined : value,
+        z.string().min(12).max(100).optional(),
+    ),
 });
 
 export const folderSchema = z.object({
@@ -37,6 +47,13 @@ export const bookmarkSchema = z.object({
 
 export const idSchema = z.coerce.number().int().positive();
 
+const MAX_REORDER_ITEMS = 2000;
+
 export const reorderSchema = z.object({
-    orderedIds: z.array(z.number().int().positive()).min(1),
+    orderedIds: z.array(z.number().int().positive()).min(1).max(MAX_REORDER_ITEMS, {
+        message: `Ordered IDs must not exceed ${MAX_REORDER_ITEMS} items`,
+    }).refine(
+        (ids) => new Set(ids).size === ids.length,
+        { message: 'Ordered IDs must not contain duplicates' },
+    ),
 });

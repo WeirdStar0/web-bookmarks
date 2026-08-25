@@ -8,13 +8,14 @@
 SECRET_KEY=your-secret-key-replace-me-in-production
 
 # 生产环境首次初始化管理员密码
-# 请使用强随机密码。生产环境未设置时不会自动创建 admin/123456。
+# 请使用至少 12 个字符的强随机密码。生产环境未设置时不会自动创建管理员账户。
 INITIAL_ADMIN_PASSWORD=replace-with-a-strong-initial-password
 
 # 可选:会话过期时间(秒),默认 7 天 (604800)
 # SESSION_MAX_AGE=604800
 
-# 可选:速率限制配置
+# 速率限制配置。生产环境还必须在 wrangler.toml 绑定 RATE_LIMIT_KV，
+# 否则登录端点会返回 503 且部署前检查会失败。
 # 每个时间窗口内的最大请求数
 # RATE_LIMIT_MAX=100
 # 时间窗口(秒)

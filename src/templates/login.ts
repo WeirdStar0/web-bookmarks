@@ -11,21 +11,21 @@ export const login = (t: TemplateTranslations) => `
                 <h1 class="text-2xl font-bold text-gray-900 dark:text-white">${t.login.welcome}</h1>
                 <p class="text-gray-500 dark:text-gray-400 text-sm mt-2">${t.login.subtitle}</p>
             </div>
-            <form @submit.prevent="login">
+            <form @submit.prevent="login" :aria-busy="isLoading">
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">${t.login.username}</label>
-                        <input type="text" x-model="loginForm.username" autocomplete="username" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="${t.login.usernamePlaceholder}">
+                                                <label for="loginUsername" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">${t.login.username}</label>
+                        <input id="loginUsername" type="text" x-model="loginForm.username" autocomplete="username" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="${t.login.usernamePlaceholder}">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">${t.login.password}</label>
-                        <input type="password" x-model="loginForm.password" autocomplete="current-password" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="${t.login.passwordPlaceholder}">
+                                                <label for="loginPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">${t.login.password}</label>
+                        <input id="loginPassword" type="password" x-model="loginForm.password" autocomplete="current-password" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors" placeholder="${t.login.passwordPlaceholder}">
                     </div>
                 </div>
                 <div class="mt-6">
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg shadow-lg transition-all transform hover:scale-[1.02]">${t.login.loginButton}</button>
+                    <button type="submit" :disabled="isLoading" :aria-disabled="isLoading" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg shadow-lg transition-all transform hover:scale-[1.02]">${t.login.loginButton}</button>
                 </div>
-                <p x-show="loginError" class="text-red-500 text-sm text-center mt-4" x-text="loginError"></p>
+                <p x-show="loginError" role="alert" aria-live="assertive" class="text-red-500 text-sm text-center mt-4" x-text="loginError"></p>
             </form>
         </div>
     </div>

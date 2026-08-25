@@ -24,6 +24,16 @@
 	handleDragOver(event, type) {
 	    event.preventDefault();
 	    event.dataTransfer.dropEffect = 'move';
+	    const targetElement = event.target.closest('.' + type + '-item');
+	    if (!targetElement) {
+	        this.dropTarget = null;
+	        return;
+	    }
+	    const currentList = type === 'folder' ? this.currentFolders : this.currentBookmarks;
+	    const allElements = Array.from(document.querySelectorAll('.' + type + '-item'));
+	    const targetIndex = allElements.indexOf(targetElement);
+	    const targetItem = currentList[targetIndex];
+	    this.dropTarget = targetItem ? { type, id: targetItem.id } : null;
 	},
 
 	async handleDrop(event, targetType) {

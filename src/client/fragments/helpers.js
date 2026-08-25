@@ -11,25 +11,30 @@ handleUnauthorized() {
     this.loginError = '';
 },
 
-async apiFetch(url, options = {}) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
-    const response = await fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timeout));
-    if (!response.ok) {
-        if (response.status === 401) {
-            this.handleUnauthorized();
-            throw new Error('Unauthorized');
-        }
+    async apiFetch(url, options = {}) {
+        const { shouldHandleUnauthorized, ...requestOptions } = options;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch(url, { ...requestOptions, signal: controller.signal }).finally(() => clearTimeout(timeout));
+        if (!response.ok) {
+            if (response.status === 401) {
+                // A response from an older load must not clear a session that
+                // a later request has already established or refreshed.
+                if (typeof shouldHandleUnauthorized !== 'function' || shouldHandleUnauthorized()) {
+                    this.handleUnauthorized();
+                }
+                throw new Error('Unauthorized');
+            }
         let message = 'Request failed with status: ' + response.status;
         try {
             const text = await response.text();
             if (text) {
                 try {
                     const data = JSON.parse(text);
-                    if (data && typeof data.error === 'string' && data.error) {
-                        message = data.error;
-                    } else if (data && typeof data.message === 'string' && data.message) {
+                    if (data && typeof data.message === 'string' && data.message) {
                         message = data.message;
+                    } else if (data && typeof data.error === 'string' && data.error) {
+                        message = data.error;
                     }
                 } catch {
                     message = text;
@@ -51,6 +56,21 @@ async runAndRefresh(fn, { refreshTrash = false } = {}) {
         }
         await this.loadData();
     });
+},
+
+rememberModalFocus() {
+    const active = document.activeElement;
+    this._modalReturnFocus = active && typeof active.focus === 'function' ? active : null;
+},
+
+closeModal(property) {
+    this[property] = false;
+    this.selectorOpen = false;
+    const previous = this._modalReturnFocus;
+    this._modalReturnFocus = null;
+    if (previous && previous.isConnected) {
+        setTimeout(() => previous.focus(), 0);
+    }
 },
 
 confirmAndRun(message, callback) {

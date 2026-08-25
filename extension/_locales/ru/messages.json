@@ -109,5 +109,80 @@
     },
     "language": {
         "message": "Язык"
+    },
+    "pendingSyncFull": {
+        "message": "Очередь синхронизации заполнена. Восстановите соединение и повторите попытку."
+    },
+    "pendingSyncWaiting": {
+        "message": "Закладки ожидают синхронизации."
+    },
+    "pendingSyncRemaining": {
+        "message": "Некоторые закладки всё ещё ожидают синхронизации."
+    },
+    "sessionExpiredSync": {
+        "message": "Срок сеанса истёк. Войдите снова, чтобы синхронизировать отложенные закладки."
+    },
+    "syncFailed": {
+        "message": "Синхронизация не выполнена"
+    },
+    "serverLoginProtectionMissing": {
+        "message": "Защита входа на сервере не настроена. Обратитесь к администратору."
+    },
+    "sessionExpired": {
+        "message": "Срок сеанса истёк. Войдите снова."
+    },
+    "pendingSaveQueued": {
+        "message": "Сохранено для безопасной повторной попытки после восстановления соединения."
+    },
+    "minSearchChars": {
+        "message": "Введите минимум 2 символа для поиска."
+    },
+    "searching": {
+        "message": "Поиск…"
+    },
+    "searchFailed": {
+        "message": "Поиск не выполнен. Повторите попытку."
+    },
+    "searchOffline": {
+        "message": "Нельзя искать без подключения. Проверьте сеть."
+    },
+    "toggleSubfolders": {
+        "message": "Развернуть или свернуть вложенные папки"
+    },
+    "retryPendingSaves": {
+        "message": "Повторить ожидающие закладки сейчас"
+    },
+    "syncRetrying": {
+        "message": "Повторная попытка синхронизации ожидающих закладок…"
+    },
+    "offlineCachedMode": {
+        "message": "Автономный режим: доступны кэшированные папки, а новые закладки будут поставлены в очередь."
+    },
+    "extensionOrigin": {
+        "message": "Origin расширения"
+    },
+    "copyExtensionOrigin": {
+        "message": "Копировать"
+    },
+    "extensionOriginDesc": {
+        "message": "Добавьте этот Origin в ALLOWED_EXTENSION_ORIGINS Worker и повторно разверните его, чтобы безопасно подключить эту установку расширения."
+    },
+    "extensionOriginCopied": {
+        "message": "Origin расширения скопирован. Добавьте его в список разрешений Worker и повторно разверните."
+    },
+    "extensionOriginCopyFailed": {
+        "message": "Не удалось скопировать Origin расширения. Выделите и скопируйте его вручную."
+    },
+    "pendingStorageFailed": {
+        "message": "Не удалось локально сохранить ожидающую закладку. Не закрывайте это окно и повторите попытку."
+    },
+    "pendingSavesTitle": {
+        "message": "Ожидающие закладки"
+    },
+    "pendingSaveWaiting": {
+        "message": "Ожидает синхронизации"
+    },
+    "removePendingSave": {
+        "message": "Удалить"
     }
 }

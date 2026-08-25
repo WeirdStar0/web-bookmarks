@@ -46,7 +46,7 @@
 
 ## 📋 开发前置要求
 
-- Node.js 20.19.0 或更高版本
+- Node.js 22.13.0（仓库通过 `.nvmrc` 固定此版本）
 - Wrangler CLI (Cloudflare 开发工具)
 
 
@@ -82,14 +82,17 @@
    npx wrangler login
    npx wrangler d1 create bookmarks-db
    # 将输出的 database_id 填入 wrangler.toml (必须在 [[d1_databases]] 下填写)
-   npm run db:init:remote
+   npm run check:migrations
+   # 仅对全新或已有正确迁移账本的 D1 数据库应用迁移
+   npm run db:migrate:remote
    ```
 
 3. **设置密钥、初始管理员密码并部署**
    ```bash
    npx wrangler secret put SECRET_KEY
    npx wrangler secret put INITIAL_ADMIN_PASSWORD
-   npm run deploy
+   npm run deploy:check
+   npx wrangler deploy
    ```
 
 ## 🛠️ 本地开发 (Local Development)
@@ -100,6 +103,8 @@
 ```bash
 git clone https://github.com/WeirdStar0/web-bookmarks-.git
 cd web-bookmarks-
+# 使用 Node.js 22（仓库通过 .nvmrc 固定版本）
+nvm use
 npm install
 ```
 
@@ -108,8 +113,8 @@ npm install
 # 创建本地 D1 数据库实例
 npx wrangler d1 create bookmarks-db
 
-# 运行 SQL 初始化表结构 (本地模式，全新数据库)
-npm run db:init:local
+# 推荐：从 001 开始应用完整迁移序列（本地模式，全新数据库）
+npm run db:migrate:local
 ```
 
 ### 3. 环境变量配置
@@ -121,18 +126,21 @@ openssl rand -base64 32
 在 `.dev.vars` 中填入：
 ```bash
 SECRET_KEY=你的随机密钥
-INITIAL_ADMIN_PASSWORD=你的初始管理员密码
+# 生产环境必须至少 12 个字符，并使用强随机口令
+INITIAL_ADMIN_PASSWORD=你的强初始管理员密码
 ```
 
 ### 4. 启动开发服务器
 ```bash
 npm run dev
 ```
-访问 `http://localhost:8787`。本地开发未设置 `INITIAL_ADMIN_PASSWORD` 时默认账号为 `admin` / 密码 `123456`；生产环境必须显式设置初始密码。
+访问 `http://localhost:8787`。本地开发未设置 `INITIAL_ADMIN_PASSWORD` 时，默认账号为 `admin`，密码为 `local-development-only`；该默认值仅用于本地调试。生产环境必须显式设置至少 12 个字符的强初始密码。若旧安装仍保存历史已知弱默认口令，生产请求会失败关闭，直到提供 `INITIAL_ADMIN_PASSWORD`；系统会用该配置的强口令替换历史弱口令，而不会再迁移到另一组已知默认凭据。
 
-### 5. 旧数据库升级 (数据库迁移)
-如果你的数据库是之前已初始化的旧数据库，**请绝对不要运行 schema.sql 重新初始化**（或运行 db:init 命令），否则可能会引发状态冲突。
-请明确走 D1 官方的迁移路径进行无损升级：
+### 5. 数据库初始化与升级 (D1 迁移)
+
+迁移序列现以 `001_initial_schema.sql` 为基线。**全新空数据库，以及已经存在正确 `d1_migrations` 账本的旧数据库，应优先使用迁移命令**；它会按顺序创建或升级所需结构。部署门禁会验证远程库已记录全部迁移。
+
+对于已投入使用的旧数据库，**请不要重新执行 `schema.sql` 或 `db:init` 命令**，以避免跳过迁移治理或产生状态混淆。如果旧库由早期运行时路径初始化，已经有完整业务表但没有 `d1_migrations` 账本，也不要盲目重放整条迁移链；请先按照 [`docs/production-runbook.md`](docs/production-runbook.md) 检查实际模式和数据，再执行迁移。其他情况请使用 D1 迁移命令进行无损升级：
 ```bash
 # 升级本地开发数据库
 npm run db:migrate:local
@@ -141,6 +149,9 @@ npm run db:migrate:local
 npm run db:migrate:remote
 ```
 
+`npm run db:init:local` 与 `npm run db:init:remote` 仅保留给需要一次性装载当前完整运行时模式的全新数据库；它们会同时写入 `001` 至当前版本的迁移记录。无论采用哪种方式，均不要在已有业务数据的数据库上使用初始化命令。生产旧库若缺少 `d1_migrations` 表，请按照 [`docs/production-runbook.md`](docs/production-runbook.md) 做模式核对和账本修复，不要直接执行全新库初始化。
+
+`010_enforce_folder_depth_limit.sql` 会为目录的 **12 层最大深度** 增加数据库级插入与移动保护。`011_enforce_active_parent_existence.sql` 会进一步要求活动目录和书签只能引用**存在且未删除**的父目录。`013_unique_active_folder_sibling_name.sql` 会阻止同一父目录下出现同名活动目录，从数据库层消除并发写入竞态。三项迁移均不会主动重写现有目录关系；如果旧库已经存在同级同名活动目录，应用 `013` 前应先人工合并或重命名重复项。旧库必须通过 `npm run db:migrate:remote` 应用这些迁移，才能使直接 SQL 写入和并发写入也遵守相同约束。
 
 前端资源由本地构建链自动生成，不要直接手改生成产物：
 - `src/templates/appAsset.ts` 由 `npm run build:app-asset` 生成
@@ -160,11 +171,30 @@ npm run db:migrate:remote
 
 ## 🔒 进阶配置
 
-### 启用速率限制 (可选)
-为了防止暴力破解，建议启用 KV 存储进行速率限制：
-1. 创建 KV 命名空间：`npx wrangler kv:namespace create RATE_LIMIT_KV`
-2. 将返回的 `id` 填入 `wrangler.toml` 中的 `kv_namespaces` 部分。
-3. 重新运行 `npm run deploy`。
+### 配置速率限制（生产部署必需）
+为避免登录端点在缺少限流时暴露给暴力破解，生产部署必须绑定 KV 存储：
+1. 创建 KV 命名空间：`npx wrangler kv namespace create RATE_LIMIT_KV`
+2. 将返回的真实 `id` 填入 `wrangler.toml` 中启用的 `[[kv_namespaces]]` 配置块。
+3. 使用 `npx wrangler secret put SECRET_KEY` 和 `npx wrangler secret put INITIAL_ADMIN_PASSWORD` 设置生产密钥。
+4. 运行 `npm run deploy:check` 确认绑定和远程迁移通过，再执行 `npx wrangler deploy`。
+
+若未完成绑定，或者已绑定的 KV 在运行时读写失败，`/api/login` 都会返回 `503`；这能避免限流不可用时登录端点退化为可暴力破解状态。部署前检查同样会阻止未绑定 KV 的发布。
+
+可在 Cloudflare Dashboard 或 `wrangler.toml` 中调整下列可选变量。无效、超范围或非整数值会自动回退到安全默认值，避免错误部署配置产生永久会话、失效 Cookie 或不可预期的限流行为。
+
+| 变量 | 默认值 | 有效范围 |
+|---|---:|---:|
+| `SESSION_MAX_AGE`（秒） | 604800 | 60–2592000（1 分钟–30 天） |
+| `RATE_LIMIT_MAX` | 100 | 1–10000 |
+| `RATE_LIMIT_WINDOW`（秒） | 60 | 1–86400 |
+| `RATE_LIMIT_LOGIN_MAX` | 5 | 1–100 |
+| `RATE_LIMIT_LOGIN_WINDOW`（秒） | 60 | 1–86400 |
+
+### 目录与数据读取边界
+
+目录树最大深度为 **12 层**（根目录计为第 1 层）。该限制同时适用于创建目录和移动包含子目录的目录；超出时 API 返回 `400` 与 `FOLDER_DEPTH_LIMIT`，从而避免递归导出、统计和目录选择器因异常深度失去可用性。
+
+`GET /api/data` 默认返回活动目录、当前目录下的书签和全库直系书签计数。主站切换到具体目录时使用 `GET /api/data?folderId=<id>`，根目录使用不带 `folderId` 的兼容形式；服务端不会再为每次目录切换传输整库书签。仅需要目录选择器的客户端应使用 `GET /api/data?includeBookmarks=false`，服务端会跳过书签查询和计数聚合并返回空的 `bookmarks` 数组；随仓库提供的浏览器扩展已使用该轻量模式。
 
 ### 允许浏览器扩展访问 (可选)
 默认不会放行任意浏览器扩展源。需要显式配置允许的扩展 Origin：
@@ -175,6 +205,7 @@ npm run db:migrate:remote
    ALLOWED_EXTENSION_ORIGINS = "chrome-extension://abcdefghijklmnopqrstuvwxyzabcdef"
    ```
 4. 这个仓库的扩展已固定 `key`，因此同一份源码生成的扩展 ID 会保持一致；如果你重新生成 `key`，对应 ID 也会变化。
+5. 扩展切换到不同服务器时，会在新主机授权成功后自动尝试撤销旧主机的可选访问权限；同一主机的不同路径不会触发撤销。
 
 ## 🧩 浏览器扩展 (Browser Extension)
 
@@ -185,7 +216,7 @@ npm run db:migrate:remote
 - **自定义主题**: 支持自动跟随系统或手动切换亮色/暗色模式。
 - **智能保存**: 自动获取当前页面标题和网址,支持添加描述。
 - **快速归类**: 自动记住上次选择的文件夹,并支持基于名称和 URL 的实时搜索。
-- **Favicon 支持**: 搜索结果中实时显示网站图标,识别更快速。
+- **隐私优先**: 主应用不再请求第三方 favicon 服务，避免将书签地址暴露给外部服务。
 
 ### 📦 安装步骤
 1. 打开 Chrome 浏览器,访问 `chrome://extensions/`
@@ -195,8 +226,8 @@ npm run db:migrate:remote
 
 ### ⚙️ 配置说明
 1. 点击扩展程序图标,首次打开会进入设置页面
-2. 在“服务器地址”中填入你部署的 Cloudflare Worker URL
-3. 登录你的管理员账号,即可开始使用
+2. 在“服务器地址”中填入 HTTPS Cloudflare Worker URL；仅 `localhost` 和 `127.0.0.1` 允许 HTTP 开发连接。
+3. 浏览器会要求确认该服务器域名的访问权限；授权后再登录管理员账号。
 
 ---
 
@@ -227,7 +258,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```bash
 npm run db:reset:local
 ```
-重置后本地开发仍可使用 admin / 123456；生产环境需要通过配置 INITIAL_ADMIN_PASSWORD 来进行新管理员初始化。
+重置后本地开发使用 `admin / local-development-only`；生产环境需要通过配置 `INITIAL_ADMIN_PASSWORD` 来进行新管理员初始化。
 
 ### 4. 速率限制不生效？
 - 确保已创建 KV 命名空间：`npx wrangler kv:namespace create RATE_LIMIT_KV`
@@ -326,10 +357,11 @@ ALLOWED_EXTENSION_ORIGINS=chrome-extension://your-extension-id
 
 ## 🔒 安全建议
 
-1. **修改初始密码**: 生产环境使用 `INITIAL_ADMIN_PASSWORD` 首次登录后，立即在设置中改成长期密码
+1. **修改初始密码**: 生产环境使用 `INITIAL_ADMIN_PASSWORD` 首次登录后，立即在设置中改成长期密码；修改用户名或密码会撤销所有既有会话，需使用新凭据重新登录。
 2. **使用 HTTPS**: Cloudflare Workers 默认提供 HTTPS
-3. **定期备份**: 定期导出书签数据作为备份
-4. **API Token 安全**: 不要将 Cloudflare API Token 提交到代码库
+3. **主动注销**: 注销会撤销现有会话版本，可使其他标签页或被复制的旧 Cookie 立即失效。
+4. **定期备份**: 定期导出书签数据作为备份
+5. **API Token 安全**: 不要将 Cloudflare API Token 提交到代码库
 
 ## 🤝 贡献
 

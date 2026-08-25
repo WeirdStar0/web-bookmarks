@@ -15,14 +15,22 @@ async login() {
 },
 
 async logout() {
-    await this.withLoading(async () => {
-        await fetch('/api/logout', { method: 'POST' });
+    try {
+        await this.withLoading(async () => {
+            await this.apiFetch('/api/logout', { method: 'POST' });
+        });
+    } catch (e) {
+        // Clear local UI state even if the network is unavailable, but make it
+        // explicit that server-side session revocation was not confirmed.
+        this.showToast(window.translations.toast.operationFailed + ': ' + e.message, 'error');
+    } finally {
         this.clearSessionState();
         this.loginForm = { username: '', password: '' };
-    });
+    }
 },
 
 openFolderModal(folder = null) {
+    this.rememberModalFocus();
     if (folder) {
         this.editMode = true;
         this.editingId = folder.id;
@@ -48,7 +56,7 @@ async createFolder() {
         } else {
             await this.submitJson('/api/folders', { name: this.newFolderName, parent_id: this.newFolderParentId });
         }
-        this.showFolderModal = false;
+        this.closeModal('showFolderModal');
         await this.loadData();
     });
 },
@@ -60,6 +68,7 @@ deleteFolder(id) {
 },
 
 openBookmarkModal(bookmark = null) {
+    this.rememberModalFocus();
     if (bookmark) {
         this.editMode = true;
         this.editingId = bookmark.id;
@@ -99,7 +108,7 @@ async createBookmark() {
                 folder_id: this.newBookmarkFolderId,
             });
         }
-        this.showBookmarkModal = false;
+        this.closeModal('showBookmarkModal');
         await this.loadData();
     });
 },
@@ -156,21 +165,42 @@ emptyTrash() {
 },
 
 openSettingsModal() {
+    this.rememberModalFocus();
     this.settingsForm = { username: '', password: '' };
     this.showSettingsModal = true;
 },
 
-async updateSettings() {
-    await this.withLoading(async () => {
-        try {
-            await this.submitJson('/api/settings', this.settingsForm, 'PUT');
-            this.showSettingsModal = false;
-            this.showToast(window.translations.toast.settingsUpdated, 'success');
-        } catch (e) {
-            this.showToast(e.message || window.translations.toast.updateFailed, 'error');
-        }
-    });
-},
+    async updateSettings() {
+        await this.withLoading(async () => {
+            const nextUsername = this.settingsForm.username;
+            const nextPassword = this.settingsForm.password;
+            const payload = {};
+            if (nextUsername) payload.username = nextUsername;
+            if (nextPassword) payload.password = nextPassword;
+            if (Object.keys(payload).length === 0) {
+                this.showToast(window.translations.toast.operationFailed, 'error');
+                return;
+            }
+            const credentialsChanged = Boolean(nextUsername || nextPassword);
+            try {
+                await this.submitJson('/api/settings', payload, 'PUT');
+                this.closeModal('showSettingsModal');
+                this.settingsForm = { username: '', password: '' };
+                this.showToast(window.translations.toast.settingsUpdated, 'success');
+
+                // The server rotates session_version when account credentials
+                // change, so the current Cookie is intentionally no longer
+                // authorized. Reflect that immediately instead of leaving the
+                // dashboard visible until its next API call fails.
+                if (credentialsChanged) {
+                    this.handleUnauthorized();
+                    this.loginForm = { username: nextUsername || '', password: '' };
+                }
+            } catch (e) {
+                this.showToast(e.message || window.translations.toast.updateFailed, 'error');
+            }
+        });
+    },
 
 toggleDarkMode() {
     this.darkMode = !this.darkMode;
@@ -199,14 +229,21 @@ showToast(message, type = 'success') {
 },
 
 confirmAction(message, callback) {
+    this.rememberModalFocus();
     this.confirmMessage = message;
     this.confirmCallback = callback;
     this.showConfirmModal = true;
 },
 
-executeConfirm() {
-    if (this.confirmCallback) {
-        this.confirmCallback();
+async executeConfirm() {
+    const callback = this.confirmCallback;
+    this.confirmCallback = null;
+    this.closeModal('showConfirmModal');
+    if (!callback) return;
+
+    try {
+        await callback();
+    } catch (e) {
+        this.showToast(window.translations.toast.operationFailed + ': ' + e.message, 'error');
     }
-    this.showConfirmModal = false;
 }

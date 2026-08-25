@@ -4,6 +4,7 @@ get currentFolders() {
     }
     let items = this.folders.filter(f => f.parent_id === this.currentFolderId);
     if (this.searchQuery) {
+        if (this.searchResults) return this.searchResults.folders;
         items = this.folders.filter(f => f.name.toLowerCase().includes(this.searchQuery.toLowerCase()));
     }
     return items;
@@ -15,6 +16,7 @@ get currentBookmarks() {
     }
     let items = this.bookmarks.filter(b => b.folder_id === this.currentFolderId);
     if (this.searchQuery) {
+        if (this.searchResults) return this.searchResults.bookmarks;
         items = this.bookmarks.filter(b => b.title.toLowerCase().includes(this.searchQuery.toLowerCase()) || b.url.toLowerCase().includes(this.searchQuery.toLowerCase()));
     }
     return items;
@@ -146,6 +148,19 @@ getFolderName(id) {
     if (!id) return window.translations?.modals?.rootFolder ?? 'Root';
     const folder = this.folders.find(f => f.id === id);
     return folder ? folder.name : (window.translations?.modals?.unknownFolder ?? 'Unknown');
+},
+
+isFolderDescendant(folderId, ancestorId) {
+    if (!folderId || !ancestorId || folderId === ancestorId) return false;
+    const visited = new Set();
+    let current = this.folders.find((folder) => folder.id === folderId);
+    while (current?.parent_id !== null && current?.parent_id !== undefined) {
+        if (visited.has(current.id)) return false;
+        visited.add(current.id);
+        if (current.parent_id === ancestorId) return true;
+        current = this.folders.find((folder) => folder.id === current.parent_id);
+    }
+    return false;
 },
 
 toggleSelector(id) {

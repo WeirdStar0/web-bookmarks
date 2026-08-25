@@ -109,5 +109,80 @@
     },
     "language": {
         "message": "Idioma"
+    },
+    "pendingSyncFull": {
+        "message": "A fila de sincronização está cheia. Restaure a conexão e tente novamente."
+    },
+    "pendingSyncWaiting": {
+        "message": "Há favoritos aguardando sincronização."
+    },
+    "pendingSyncRemaining": {
+        "message": "Ainda há favoritos aguardando sincronização."
+    },
+    "sessionExpiredSync": {
+        "message": "A sessão expirou. Entre novamente para sincronizar os favoritos pendentes."
+    },
+    "syncFailed": {
+        "message": "Falha na sincronização"
+    },
+    "serverLoginProtectionMissing": {
+        "message": "A proteção de login do servidor não está configurada. Contate o administrador."
+    },
+    "sessionExpired": {
+        "message": "A sessão expirou. Entre novamente."
+    },
+    "pendingSaveQueued": {
+        "message": "Salvo para uma nova tentativa segura quando a conexão voltar."
+    },
+    "minSearchChars": {
+        "message": "Digite pelo menos 2 caracteres para pesquisar."
+    },
+    "searching": {
+        "message": "Pesquisando…"
+    },
+    "searchFailed": {
+        "message": "A pesquisa falhou. Tente novamente."
+    },
+    "searchOffline": {
+        "message": "Não é possível pesquisar offline. Verifique a conexão."
+    },
+    "toggleSubfolders": {
+        "message": "Expandir ou recolher subpastas"
+    },
+    "retryPendingSaves": {
+        "message": "Tentar novamente os favoritos pendentes agora"
+    },
+    "syncRetrying": {
+        "message": "Tentando novamente os favoritos pendentes…"
+    },
+    "offlineCachedMode": {
+        "message": "Modo offline: as pastas em cache estão disponíveis e novos favoritos entrarão na fila."
+    },
+    "extensionOrigin": {
+        "message": "Origem da extensão"
+    },
+    "copyExtensionOrigin": {
+        "message": "Copiar"
+    },
+    "extensionOriginDesc": {
+        "message": "Adicione esta origem a ALLOWED_EXTENSION_ORIGINS do Worker e faça nova implantação para conectar esta instalação com segurança."
+    },
+    "extensionOriginCopied": {
+        "message": "Origem da extensão copiada. Adicione-a à lista permitida do Worker e faça nova implantação."
+    },
+    "extensionOriginCopyFailed": {
+        "message": "Não foi possível copiar a origem da extensão. Selecione-a e copie manualmente."
+    },
+    "pendingStorageFailed": {
+        "message": "Não foi possível salvar o favorito pendente localmente. Mantenha esta janela aberta e tente novamente."
+    },
+    "pendingSavesTitle": {
+        "message": "Favoritos pendentes"
+    },
+    "pendingSaveWaiting": {
+        "message": "Aguardando sincronização"
+    },
+    "removePendingSave": {
+        "message": "Remover"
     }
 }

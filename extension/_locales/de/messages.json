@@ -109,5 +109,80 @@
     },
     "language": {
         "message": "Sprache"
+    },
+    "pendingSyncFull": {
+        "message": "Die Synchronisierungswarteschlange ist voll. Stellen Sie die Verbindung wieder her und versuchen Sie es erneut."
+    },
+    "pendingSyncWaiting": {
+        "message": "Lesezeichen warten auf die Synchronisierung."
+    },
+    "pendingSyncRemaining": {
+        "message": "Einige Lesezeichen warten weiterhin auf die Synchronisierung."
+    },
+    "sessionExpiredSync": {
+        "message": "Die Sitzung ist abgelaufen. Melden Sie sich erneut an, um ausstehende Lesezeichen zu synchronisieren."
+    },
+    "syncFailed": {
+        "message": "Synchronisierung fehlgeschlagen"
+    },
+    "serverLoginProtectionMissing": {
+        "message": "Der Anmeldeschutz des Servers ist nicht konfiguriert. Wenden Sie sich an die Administration."
+    },
+    "sessionExpired": {
+        "message": "Die Sitzung ist abgelaufen. Bitte erneut anmelden."
+    },
+    "pendingSaveQueued": {
+        "message": "Für einen sicheren Wiederholungsversuch nach Rückkehr der Verbindung gespeichert."
+    },
+    "minSearchChars": {
+        "message": "Geben Sie mindestens 2 Zeichen für die Suche ein."
+    },
+    "searching": {
+        "message": "Suche läuft…"
+    },
+    "searchFailed": {
+        "message": "Suche fehlgeschlagen. Bitte erneut versuchen."
+    },
+    "searchOffline": {
+        "message": "Offline kann nicht gesucht werden. Prüfen Sie die Verbindung."
+    },
+    "toggleSubfolders": {
+        "message": "Unterordner ein- oder ausklappen"
+    },
+    "retryPendingSaves": {
+        "message": "Ausstehende Lesezeichen jetzt erneut versuchen"
+    },
+    "syncRetrying": {
+        "message": "Ausstehende Lesezeichen werden erneut versucht…"
+    },
+    "offlineCachedMode": {
+        "message": "Offlinemodus: Zwischengespeicherte Ordner sind verfügbar und neue Lesezeichen werden vorgemerkt."
+    },
+    "extensionOrigin": {
+        "message": "Erweiterungs-Origin"
+    },
+    "copyExtensionOrigin": {
+        "message": "Kopieren"
+    },
+    "extensionOriginDesc": {
+        "message": "Fügen Sie diesen Origin zu ALLOWED_EXTENSION_ORIGINS des Workers hinzu und stellen Sie ihn erneut bereit, um diese Installation sicher zu verbinden."
+    },
+    "extensionOriginCopied": {
+        "message": "Erweiterungs-Origin kopiert. Fügen Sie ihn zur Worker-Zulassungsliste hinzu und stellen Sie erneut bereit."
+    },
+    "extensionOriginCopyFailed": {
+        "message": "Der Erweiterungs-Origin konnte nicht kopiert werden. Wählen Sie ihn aus und kopieren Sie ihn manuell."
+    },
+    "pendingStorageFailed": {
+        "message": "Das ausstehende Lesezeichen konnte nicht lokal gespeichert werden. Lassen Sie dieses Fenster geöffnet und versuchen Sie es erneut."
+    },
+    "pendingSavesTitle": {
+        "message": "Ausstehende Lesezeichen"
+    },
+    "pendingSaveWaiting": {
+        "message": "Wartet auf Synchronisierung"
+    },
+    "removePendingSave": {
+        "message": "Entfernen"
     }
 }

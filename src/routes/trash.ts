@@ -9,10 +9,13 @@ import {
 import { err, ErrCode } from '../utils/common';
 import type { ApiApp } from './types';
 
+const FOLDER_PUBLIC_COLUMNS = 'id, name, parent_id, sort_order, is_deleted, created_at, updated_at';
+const BOOKMARK_PUBLIC_COLUMNS = 'id, title, url, description, folder_id, sort_order, is_deleted, created_at, updated_at';
+
 export function registerTrashRoutes(app: ApiApp) {
     app.get('/trash', async (c) => {
-        const { results: folders } = await c.env.DB.prepare('SELECT * FROM folders WHERE is_deleted = 1 ORDER BY name').all();
-        const { results: bookmarks } = await c.env.DB.prepare('SELECT * FROM bookmarks WHERE is_deleted = 1 ORDER BY created_at DESC').all();
+        const { results: folders } = await c.env.DB.prepare(`SELECT ${FOLDER_PUBLIC_COLUMNS} FROM folders WHERE is_deleted = 1 ORDER BY name`).all();
+        const { results: bookmarks } = await c.env.DB.prepare(`SELECT ${BOOKMARK_PUBLIC_COLUMNS} FROM bookmarks WHERE is_deleted = 1 ORDER BY created_at DESC`).all();
         return c.json({ folders, bookmarks });
     });
 

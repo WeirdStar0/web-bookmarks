@@ -109,5 +109,80 @@
     },
     "language": {
         "message": "Langue"
+    },
+    "pendingSyncFull": {
+        "message": "La file de synchronisation est pleine. Rétablissez la connexion puis réessayez."
+    },
+    "pendingSyncWaiting": {
+        "message": "Des favoris attendent la synchronisation."
+    },
+    "pendingSyncRemaining": {
+        "message": "Des favoris attendent toujours la synchronisation."
+    },
+    "sessionExpiredSync": {
+        "message": "La session a expiré. Reconnectez-vous pour synchroniser les favoris en attente."
+    },
+    "syncFailed": {
+        "message": "Échec de la synchronisation"
+    },
+    "serverLoginProtectionMissing": {
+        "message": "La protection de connexion du serveur n’est pas configurée. Contactez l’administrateur."
+    },
+    "sessionExpired": {
+        "message": "La session a expiré. Reconnectez-vous."
+    },
+    "pendingSaveQueued": {
+        "message": "Enregistré pour une nouvelle tentative sûre au retour de la connexion."
+    },
+    "minSearchChars": {
+        "message": "Saisissez au moins 2 caractères pour rechercher."
+    },
+    "searching": {
+        "message": "Recherche…"
+    },
+    "searchFailed": {
+        "message": "La recherche a échoué. Réessayez."
+    },
+    "searchOffline": {
+        "message": "Recherche impossible hors ligne. Vérifiez votre connexion."
+    },
+    "toggleSubfolders": {
+        "message": "Développer ou réduire les sous-dossiers"
+    },
+    "retryPendingSaves": {
+        "message": "Réessayer les favoris en attente maintenant"
+    },
+    "syncRetrying": {
+        "message": "Nouvelle tentative des favoris en attente…"
+    },
+    "offlineCachedMode": {
+        "message": "Mode hors ligne : les dossiers en cache sont disponibles et les nouveaux favoris seront mis en file d’attente."
+    },
+    "extensionOrigin": {
+        "message": "Origine de l’extension"
+    },
+    "copyExtensionOrigin": {
+        "message": "Copier"
+    },
+    "extensionOriginDesc": {
+        "message": "Ajoutez cette origine à ALLOWED_EXTENSION_ORIGINS du Worker, puis redéployez pour connecter cette installation en toute sécurité."
+    },
+    "extensionOriginCopied": {
+        "message": "Origine de l’extension copiée. Ajoutez-la à la liste autorisée du Worker puis redéployez."
+    },
+    "extensionOriginCopyFailed": {
+        "message": "Impossible de copier l’origine de l’extension. Sélectionnez-la et copiez-la manuellement."
+    },
+    "pendingStorageFailed": {
+        "message": "Impossible d’enregistrer localement le favori en attente. Gardez cette fenêtre ouverte et réessayez."
+    },
+    "pendingSavesTitle": {
+        "message": "Favoris en attente"
+    },
+    "pendingSaveWaiting": {
+        "message": "En attente de synchronisation"
+    },
+    "removePendingSave": {
+        "message": "Supprimer"
     }
 }

@@ -5,9 +5,19 @@ loginError: '',
 
 folders: [],
 bookmarks: [],
-currentFolderId: JSON.parse(localStorage.getItem('currentFolderId')) || null,
+bookmarkCounts: {},
+currentFolderId: (() => {
+    try {
+        const value = JSON.parse(localStorage.getItem('currentFolderId'));
+        return Number.isInteger(value) && value > 0 ? value : null;
+    } catch {
+        return null;
+    }
+})(),
 
 searchQuery: '',
+searchResults: null,
+searchPending: false,
 currentView: localStorage.getItem('currentView') || 'home',
 trashFolders: [],
 trashBookmarks: [],
@@ -51,4 +61,10 @@ isSorting: false,
 t: window.translations,
 
 	_sidebarCache: null,
-	_sidebarDirty: true
+	_sidebarDirty: true,
+			_dataLoadVersion: 0,
+			_trashLoadVersion: 0,
+			_authCheckVersion: 0,
+			_searchRequestVersion: 0,
+			_searchTimer: null,
+			_modalReturnFocus: null

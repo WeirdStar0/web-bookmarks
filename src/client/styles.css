@@ -33,3 +33,36 @@
 .dark ::-webkit-scrollbar-thumb:hover {
     background-color: #4b5563; /* gray-600 */
 }
+
+
+/* Keep keyboard actions visible even when pointer-only hover affordances are hidden. */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+[role="option"]:focus-visible,
+[role="treeitem"]:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+
+/* Reveal card actions for keyboard and touch users, not only mouse hover. */
+.group:focus-within > .group-hover\\:opacity-100 {
+    opacity: 1;
+}
+
+@media (hover: none) {
+    .group > .group-hover\\:opacity-100 {
+        opacity: 1;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

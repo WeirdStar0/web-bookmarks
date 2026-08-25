@@ -109,5 +109,80 @@
     },
     "language": {
         "message": "Lingua"
+    },
+    "pendingSyncFull": {
+        "message": "La coda di sincronizzazione è piena. Ripristina la connessione e riprova."
+    },
+    "pendingSyncWaiting": {
+        "message": "I segnalibri sono in attesa di sincronizzazione."
+    },
+    "pendingSyncRemaining": {
+        "message": "Alcuni segnalibri sono ancora in attesa di sincronizzazione."
+    },
+    "sessionExpiredSync": {
+        "message": "La sessione è scaduta. Accedi di nuovo per sincronizzare i segnalibri in attesa."
+    },
+    "syncFailed": {
+        "message": "Sincronizzazione non riuscita"
+    },
+    "serverLoginProtectionMissing": {
+        "message": "La protezione di accesso del server non è configurata. Contatta l’amministratore."
+    },
+    "sessionExpired": {
+        "message": "La sessione è scaduta. Accedi di nuovo."
+    },
+    "pendingSaveQueued": {
+        "message": "Salvato per un nuovo tentativo sicuro al ripristino della connessione."
+    },
+    "minSearchChars": {
+        "message": "Inserisci almeno 2 caratteri per cercare."
+    },
+    "searching": {
+        "message": "Ricerca in corso…"
+    },
+    "searchFailed": {
+        "message": "Ricerca non riuscita. Riprova."
+    },
+    "searchOffline": {
+        "message": "Impossibile cercare offline. Controlla la connessione."
+    },
+    "toggleSubfolders": {
+        "message": "Espandi o comprimi le sottocartelle"
+    },
+    "retryPendingSaves": {
+        "message": "Riprova ora i segnalibri in attesa"
+    },
+    "syncRetrying": {
+        "message": "Nuovo tentativo dei segnalibri in attesa…"
+    },
+    "offlineCachedMode": {
+        "message": "Modalità offline: le cartelle in cache sono disponibili e i nuovi segnalibri verranno messi in coda."
+    },
+    "extensionOrigin": {
+        "message": "Origine dell’estensione"
+    },
+    "copyExtensionOrigin": {
+        "message": "Copia"
+    },
+    "extensionOriginDesc": {
+        "message": "Aggiungi questa origine a ALLOWED_EXTENSION_ORIGINS del Worker ed esegui di nuovo il deploy per connettere questa installazione in sicurezza."
+    },
+    "extensionOriginCopied": {
+        "message": "Origine dell’estensione copiata. Aggiungila all’elenco consentito del Worker ed esegui di nuovo il deploy."
+    },
+    "extensionOriginCopyFailed": {
+        "message": "Impossibile copiare l’origine dell’estensione. Selezionala e copiala manualmente."
+    },
+    "pendingStorageFailed": {
+        "message": "Impossibile salvare localmente il segnalibro in attesa. Mantieni aperta questa finestra e riprova."
+    },
+    "pendingSavesTitle": {
+        "message": "Segnalibri in attesa"
+    },
+    "pendingSaveWaiting": {
+        "message": "In attesa di sincronizzazione"
+    },
+    "removePendingSave": {
+        "message": "Rimuovi"
     }
 }

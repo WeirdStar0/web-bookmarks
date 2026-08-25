@@ -106,5 +106,80 @@
     },
     "unknownError": {
         "message": "予期せぬエラー"
+    },
+    "pendingSyncFull": {
+        "message": "同期待ちキューがいっぱいです。接続を復旧してから再試行してください。"
+    },
+    "pendingSyncWaiting": {
+        "message": "ブックマークは同期待ちです。"
+    },
+    "pendingSyncRemaining": {
+        "message": "同期待ちのブックマークが残っています。"
+    },
+    "sessionExpiredSync": {
+        "message": "セッションの有効期限が切れました。保留中のブックマークを同期するには再ログインしてください。"
+    },
+    "syncFailed": {
+        "message": "同期に失敗しました"
+    },
+    "serverLoginProtectionMissing": {
+        "message": "サーバーのログイン保護が設定されていません。管理者に連絡してください。"
+    },
+    "sessionExpired": {
+        "message": "セッションの有効期限が切れました。再ログインしてください。"
+    },
+    "pendingSaveQueued": {
+        "message": "安全な再試行のため、接続回復後に同期キューへ保存しました。"
+    },
+    "minSearchChars": {
+        "message": "検索するには 2 文字以上入力してください。"
+    },
+    "searching": {
+        "message": "検索中…"
+    },
+    "searchFailed": {
+        "message": "検索に失敗しました。もう一度お試しください。"
+    },
+    "searchOffline": {
+        "message": "オフラインでは検索できません。接続を確認してください。"
+    },
+    "toggleSubfolders": {
+        "message": "サブフォルダーを展開または折りたたむ"
+    },
+    "retryPendingSaves": {
+        "message": "保留中のブックマークを今すぐ再試行"
+    },
+    "syncRetrying": {
+        "message": "保留中のブックマークを再試行中…"
+    },
+    "offlineCachedMode": {
+        "message": "オフラインモード：キャッシュ済みフォルダーを利用でき、新しいブックマークは同期キューに追加されます。"
+    },
+    "extensionOrigin": {
+        "message": "拡張機能の Origin"
+    },
+    "copyExtensionOrigin": {
+        "message": "コピー"
+    },
+    "extensionOriginDesc": {
+        "message": "この Origin を Worker の ALLOWED_EXTENSION_ORIGINS に追加して再デプロイすると、この拡張機能のインストールを安全に接続できます。"
+    },
+    "extensionOriginCopied": {
+        "message": "拡張機能の Origin をコピーしました。Worker の許可リストに追加して再デプロイしてください。"
+    },
+    "extensionOriginCopyFailed": {
+        "message": "拡張機能の Origin をコピーできませんでした。手動で選択してコピーしてください。"
+    },
+    "pendingStorageFailed": {
+        "message": "保留中のブックマークをローカルに保存できませんでした。このウィンドウを開いたまま再試行してください。"
+    },
+    "pendingSavesTitle": {
+        "message": "同期待ちのブックマーク"
+    },
+    "pendingSaveWaiting": {
+        "message": "同期待ち"
+    },
+    "removePendingSave": {
+        "message": "削除"
     }
 }

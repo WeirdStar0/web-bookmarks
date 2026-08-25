@@ -6,9 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web Bookmarks</title>
     <link rel="stylesheet" href="styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
 </head>
 
 <body>
@@ -23,7 +21,7 @@
                 <span data-i18n="extName">Bookmarks</span>
             </div>
             <div class="header-actions">
-                <button id="settingsBtn" class="btn-icon" data-i18n-title="settings" title="设置">
+                <button id="settingsBtn" class="btn-icon" data-i18n-title="settings" data-i18n-aria-label="settings" aria-label="设置" title="设置">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
@@ -32,7 +30,7 @@
                             d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     </svg>
                 </button>
-                <button id="themeToggleBtn" class="btn-icon" data-i18n-title="toggleTheme" title="切换主题">
+                <button id="themeToggleBtn" class="btn-icon" data-i18n-title="toggleTheme" data-i18n-aria-label="toggleTheme" aria-label="切换主题" title="切换主题">
                     <svg class="w-5 h-5 theme-sun hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M12 3v1m0 16v1m9-9h-1M4 9H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z">
@@ -44,7 +42,7 @@
                         </path>
                     </svg>
                 </button>
-                <button id="logoutBtn" class="btn-icon btn-logout hidden" data-i18n-title="logout" title="退出">
+                <button id="logoutBtn" class="btn-icon btn-logout hidden" data-i18n-title="logout" data-i18n-aria-label="logout" aria-label="退出" title="退出">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
@@ -59,14 +57,23 @@
             <h2 style="font-size: 18px; margin-bottom: 20px; font-weight: 700;" data-i18n="extensionSettings">扩展设置</h2>
             <form id="settingsForm" class="space-y-3">
                 <div class="form-group">
-                    <label class="label" data-i18n="serverUrl">服务器地址</label>
-                    <input type="url" id="serverUrl" placeholder="https://your-worker.workers.dev" required>
-                    <p style="font-size: 11px; color: var(--text-dim); margin-top: 6px;" data-i18n="serverUrlDesc">请输入您的
+<label class="label" for="serverUrl" data-i18n="serverUrl">服务器地址</label>
+                    <input type="url" id="serverUrl" placeholder="https://your-worker.workers.dev" autocomplete="url" required aria-describedby="serverUrlDesc">
+                    <p id="serverUrlDesc" style="font-size: 11px; color: var(--text-dim); margin-top: 6px;" data-i18n="serverUrlDesc">请输入您的
                         Cloudflare Worker 部署地址
                     </p>
                 </div>
                 <div class="form-group">
-                    <label class="label" data-i18n="language">Language</label>
+                    <label class="label" data-i18n="extensionOrigin">扩展 Origin</label>
+                    <div class="origin-pairing-row">
+                        <code id="extensionOrigin" class="origin-value" aria-live="polite"></code>
+                        <button id="copyExtensionOriginBtn" type="button" class="btn-secondary" data-i18n="copyExtensionOrigin">复制</button>
+                    </div>
+                    <p class="origin-pairing-help" data-i18n="extensionOriginDesc">将此 Origin 加入 Worker 的 ALLOWED_EXTENSION_ORIGINS 后重新部署，才能安全连接当前安装的扩展。</p>
+                    <div id="extensionOriginMessage" class="status-msg hidden" role="status" aria-live="polite"></div>
+                </div>
+                <div class="form-group">
+                    <label class="label" for="langSelect" data-i18n="language">Language</label>
                     <select id="langSelect"
                         class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         style="margin-top: 4px;">
@@ -104,14 +111,16 @@
             </div>
             <form id="loginForm">
                 <div class="form-group">
+                    <label class="sr-only" for="username" data-i18n="usernamePlaceholder">用户名</label>
                     <input type="text" id="username" placeholder="用户名" data-i18n-placeholder="usernamePlaceholder"
-                        required>
+                        autocomplete="username" required>
                 </div>
                 <div class="form-group">
+                    <label class="sr-only" for="password" data-i18n="passwordPlaceholder">密码</label>
                     <input type="password" id="password" placeholder="密码" data-i18n-placeholder="passwordPlaceholder"
-                        required>
+                        autocomplete="current-password" required>
                 </div>
-                <div id="loginError" class="status-msg status-error hidden"></div>
+                <div id="loginError" class="status-msg status-error hidden" role="alert" aria-live="assertive"></div>
                 <button type="submit" class="btn-primary" style="margin-top: 8px;" data-i18n="loginBtn">立即登录</button>
             </form>
         </div>
@@ -119,41 +128,47 @@
         <!-- Main View -->
         <div id="mainView" class="flex-1 flex flex-col hidden overflow-hidden">
             <!-- Tabs -->
-            <div class="tabs">
-                <button id="tabSave" class="tab active" data-i18n="tabSave">保存书签</button>
-                <button id="tabSearch" class="tab" data-i18n="tabSearch">搜索书签</button>
+            <div class="tabs" role="tablist" aria-label="Bookmark actions">
+                <button id="tabSave" class="tab active" role="tab" aria-selected="true" aria-controls="panelSave" data-i18n="tabSave">保存书签</button>
+                <button id="tabSearch" class="tab" role="tab" aria-selected="false" aria-controls="panelSearch" data-i18n="tabSearch">搜索书签</button>
             </div>
 
             <!-- Content Area -->
             <div class="view-container">
                 <!-- Save Panel -->
-                <div id="panelSave" class="scrollable-content">
+                <div id="panelSave" class="scrollable-content" role="tabpanel" aria-labelledby="tabSave" tabindex="0">
                     <form id="saveForm">
                         <div class="form-group">
-                            <label class="label" data-i18n="selectFolder">选择文件夹</label>
+<label class="label" for="folderSelectTrigger" data-i18n="selectFolder">选择文件夹</label>
                             <input type="hidden" id="folderSelect">
                             <div class="custom-select-wrapper">
-                                <div id="folderSelectTrigger" class="select-trigger">
+                            <button id="folderSelectTrigger" class="select-trigger" type="button" aria-haspopup="tree" aria-expanded="false" aria-controls="folderTreeContainer">
                                     <span data-i18n="selectFolderPlaceholder">选择文件夹...</span>
-                                </div>
-                                <div id="folderTreeContainer" class="custom-options hidden"></div>
+                            </button>
+                                <div id="folderTreeContainer" class="custom-options hidden" role="tree" aria-label="选择文件夹"></div>
                             </div>
                         </div>
                         <div class="form-group">
-                            <label class="label" data-i18n="title">标题</label>
+                            <label class="label" for="bookmarkTitle" data-i18n="title">标题</label>
                             <input type="text" id="bookmarkTitle" placeholder="输入书签标题"
                                 data-i18n-placeholder="titlePlaceholder">
                         </div>
                         <div class="form-group">
-                            <label class="label" data-i18n="url">网址</label>
-                            <input type="text" id="bookmarkUrl">
+<label class="label" for="bookmarkUrl" data-i18n="url">网址</label>
+                            <input type="url" id="bookmarkUrl" autocomplete="url" required>
                         </div>
                         <div class="form-group">
-                            <label class="label" data-i18n="desc">描述</label>
+                            <label class="label" for="bookmarkDescription" data-i18n="desc">描述</label>
                             <textarea id="bookmarkDescription" rows="2" placeholder="输入书签描述 (可选)"
                                 data-i18n-placeholder="descPlaceholder"></textarea>
                         </div>
-                        <div id="saveMessage" class="status-msg hidden"></div>
+                        <div id="saveMessage" class="status-msg hidden" role="status" aria-live="polite"></div>
+                        <div id="syncMessage" class="status-msg hidden" role="status" aria-live="polite"></div>
+                        <section id="pendingSavesPanel" class="pending-saves hidden" aria-labelledby="pendingSavesTitle">
+                            <h3 id="pendingSavesTitle" data-i18n="pendingSavesTitle">待同步书签</h3>
+                            <div id="pendingSavesList" class="pending-saves-list"></div>
+                        </section>
+                        <button id="retryPendingSavesBtn" type="button" class="btn-secondary hidden" data-i18n="retryPendingSaves">立即重试待同步书签</button>
                         <button type="submit" class="btn-primary" style="margin-top: 8px;">
                             <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor"
                                 viewBox="0 0 24 24">
@@ -167,7 +182,7 @@
                 </div>
 
                 <!-- Search Panel -->
-                <div id="panelSearch" class="scrollable-content hidden">
+                <div id="panelSearch" class="scrollable-content hidden" role="tabpanel" aria-labelledby="tabSearch" tabindex="0">
                     <div class="search-box">
                         <div class="search-icon">
                             <svg style="width: 18px; height: 18px;" fill="none" stroke="currentColor"
@@ -176,10 +191,11 @@
                                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                             </svg>
                         </div>
+                        <label class="sr-only" for="searchInput" data-i18n="searchPlaceholder">输入关键词搜索...</label>
                         <input type="text" id="searchInput" class="search-input" placeholder="输入关键词搜索..."
-                            data-i18n-placeholder="searchPlaceholder">
+                            data-i18n-placeholder="searchPlaceholder" autocomplete="off">
                     </div>
-                    <div id="searchResults" style="flex: 1; overflow-y: auto;">
+                    <div id="searchResults" style="flex: 1; overflow-y: auto;" role="region" aria-live="polite" aria-label="搜索结果">
                         <div style="text-align: center; color: var(--text-dim); padding: 40px 0;">
                             <p style="font-size: 13px;" data-i18n="startSearch">开始输入以搜索书签</p>
                         </div>
