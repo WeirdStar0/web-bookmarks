@@ -12,31 +12,8 @@ export const main = (t: TemplateTranslations) => `
     <div x-show="loggedIn" class="h-screen flex flex-col" x-cloak>
         <!-- Navbar -->
         <nav class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700 sticky top-0 z-40">
-            <!-- Enhanced Global Loading Indicator -->
-            <div x-show="isOperationPending"
-                 class="absolute top-0 left-0 w-full h-2 bg-gray-200 dark:bg-gray-700 overflow-hidden z-50"
-                 x-transition:enter="transition ease-out duration-200"
-                 x-transition:enter-start="opacity-0"
-                 x-transition:enter-end="opacity-100"
-                 x-transition:leave="transition ease-in duration-200"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0">
-                <div class="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 bg-300% animate-shimmer"></div>
-            </div>
-            <style>
-                @keyframes shimmer {
-                    0% { background-position: 100% 0; }
-                    100% { background-position: 0 0; }
-                }
-                .animate-shimmer {
-                    background-size: 200% 100%;
-                    animation: shimmer 2s infinite linear;
-                }
-                .bg-300\% {
-                    background-size: 300% 100%;
-                }
-            </style>
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
                 <div class="flex justify-between h-16">
                     <div class="flex items-center flex-1">
                         <!-- Mobile Menu Button -->
@@ -66,7 +43,7 @@ export const main = (t: TemplateTranslations) => `
                             <button @click="openLang = !openLang" class="p-2 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors" title="Change Language">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.204 4.196L17 5v16c0 .552-.448 1-1 1H6a1 1 0 01-1-1V7.971M5 11h13.5"></path></svg>
                             </button>
-                            <div x-show="openLang" class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-1 border border-gray-100 dark:border-gray-700 transform origin-top-right transition-all z-50 overflow-y-auto max-h-80" x-transition.opacity>
+                            <div x-show="openLang" class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-1 border border-gray-100 dark:border-gray-700 z-50 overflow-y-auto max-h-80" x-transition:enter="ui-transition" x-transition:enter-start="ui-transition-start" x-transition:enter-end="ui-transition-end" x-transition:leave="ui-transition" x-transition:leave-start="ui-transition-end" x-transition:leave-end="ui-transition-start">
                                 <button @click="setLanguage('zh')" class="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">简体中文</button>
                                 <button @click="setLanguage('en')" class="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">English</button>
                                 <button @click="setLanguage('zhtw')" class="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">繁體中文</button>
@@ -92,7 +69,7 @@ export const main = (t: TemplateTranslations) => `
                                 </div>
                             </button>
                             
-                            <div x-show="open" class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-1 border border-gray-100 dark:border-gray-700 transform origin-top-right transition-all" x-transition.opacity>
+                            <div x-show="open" class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-1 border border-gray-100 dark:border-gray-700 transform origin-top-right transition-all" x-transition:enter="ui-transition" x-transition:enter-start="ui-transition-start" x-transition:enter-end="ui-transition-end" x-transition:leave="ui-transition" x-transition:leave-start="ui-transition-end" x-transition:leave-end="ui-transition-start">
                                 <button @click="openSettingsModal(); open = false" class="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                     ${t.dashboard.settings}
@@ -114,13 +91,13 @@ export const main = (t: TemplateTranslations) => `
                         <div x-show="mobileMenuOpen"
                  @click="mobileMenuOpen = false" 
                  class="fixed inset-0 bg-black/50 z-40 md:hidden"
-                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter="ui-transition"
 
-                 x-transition:enter-start="opacity-0"
-                 x-transition:enter-end="opacity-100"
-                 x-transition:leave="transition ease-in duration-200"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0"></div>
+                 x-transition:enter-start="ui-transition-start"
+                 x-transition:enter-end="ui-transition-end"
+                 x-transition:leave="ui-transition"
+                 x-transition:leave-start="ui-transition-end"
+                 x-transition:leave-end="ui-transition-start"></div>
 
             <!-- Sidebar -->
             <aside :class="mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'" 
@@ -215,24 +192,24 @@ export const main = (t: TemplateTranslations) => `
                          aria-live="polite"
                          aria-busy="true"
                          class="absolute inset-0 z-10 flex items-start justify-center pt-8 pointer-events-none bg-gray-50/65 dark:bg-gray-900/65 backdrop-blur-[1px]"
-                         x-transition:enter="folder-nav-transition"
-                         x-transition:enter-start="folder-nav-start"
-                         x-transition:enter-end="folder-nav-end"
-                         x-transition:leave="folder-nav-transition"
-                         x-transition:leave-start="folder-nav-end"
-                         x-transition:leave-end="folder-nav-start">
-                        <div class="flex items-center gap-3 rounded-full bg-white/95 dark:bg-gray-800/95 px-4 py-2.5 shadow-lg ring-1 ring-gray-200 dark:ring-gray-700">
-                            <span class="h-5 w-5 rounded-full border-2 border-blue-200 dark:border-blue-900 border-t-blue-600 dark:border-t-blue-400 folder-nav-spinner" aria-hidden="true"></span>
-                            <span class="text-sm font-medium text-gray-700 dark:text-gray-200">${t.dashboard.loading}</span>
+                         x-transition:enter="loading-transition"
+                         x-transition:enter-start="loading-start"
+                         x-transition:enter-end="loading-end"
+                         x-transition:leave="loading-transition"
+                         x-transition:leave-start="loading-end"
+                         x-transition:leave-end="loading-start">
+                        <div class="loading-pill">
+                            <span class="loading-spinner" aria-hidden="true"></span>
+                            <span class="text-sm font-medium">${t.dashboard.loading}</span>
                         </div>
                     </div>
 
                     <!-- Folders Grid -->
 
                     <div x-show="currentFolders.length > 0" class="mb-8"
-                         x-transition:enter="folder-nav-transition"
-                         x-transition:enter-start="folder-nav-start"
-                         x-transition:enter-end="folder-nav-end">
+                         x-transition:enter="loading-transition"
+                         x-transition:enter-start="loading-start"
+                         x-transition:enter-end="loading-end">
                         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">${t.dashboard.folders}</h3>
                         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
                              @dragover.prevent="handleDragOver($event, 'folder')"
@@ -288,12 +265,12 @@ export const main = (t: TemplateTranslations) => `
                          aria-live="polite"
                          aria-busy="true"
                          class="mb-8"
-                         x-transition:enter="folder-nav-transition"
-                         x-transition:enter-start="folder-nav-start"
-                         x-transition:enter-end="folder-nav-end"
-                         x-transition:leave="folder-nav-transition"
-                         x-transition:leave-start="folder-nav-end"
-                         x-transition:leave-end="folder-nav-start">
+                         x-transition:enter="loading-transition"
+                         x-transition:enter-start="loading-start"
+                         x-transition:enter-end="loading-end"
+                         x-transition:leave="loading-transition"
+                         x-transition:leave-start="loading-end"
+                         x-transition:leave-end="loading-start">
                         <span class="sr-only">${t.dashboard.loading}</span>
                         <div class="h-4 w-28 rounded bg-gray-200 dark:bg-gray-700 mb-4" aria-hidden="true"></div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" aria-hidden="true">
@@ -314,9 +291,9 @@ export const main = (t: TemplateTranslations) => `
                     <!-- Bookmarks Grid -->
                     <div x-show="!isFolderLoading && currentBookmarks.length > 0"
 
-                         x-transition:enter="folder-nav-transition"
-                         x-transition:enter-start="folder-nav-start"
-                         x-transition:enter-end="folder-nav-end">
+                         x-transition:enter="loading-transition"
+                         x-transition:enter-start="loading-start"
+                         x-transition:enter-end="loading-end">
                         <h3 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-4">${t.dashboard.bookmarks}</h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
                              @dragover.prevent="handleDragOver($event, 'bookmark')"
@@ -393,13 +370,13 @@ export const main = (t: TemplateTranslations) => `
 
         <!-- Toast Notification -->
                 <div x-show="toast.show"
-             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter="ui-transition"
 
-             x-transition:enter-start="opacity-0 transform translate-y-2"
-             x-transition:enter-end="opacity-100 transform translate-y-0"
-             x-transition:leave="transition ease-in duration-200"
-             x-transition:leave-start="opacity-100 transform translate-y-0"
-             x-transition:leave-end="opacity-0 transform translate-y-2"
+             x-transition:enter-start="ui-transition-start"
+             x-transition:enter-end="ui-transition-end"
+             x-transition:leave="ui-transition"
+             x-transition:leave-start="ui-transition-end"
+             x-transition:leave-end="ui-transition-start"
              class="fixed bottom-6 right-6 z-50" x-cloak>
             <div :class="{'bg-green-500': toast.type === 'success', 'bg-red-500': toast.type === 'error'}" class="text-white px-6 py-3 rounded-lg shadow-lg flex items-center space-x-3">
                 <svg x-show="toast.type === 'success'" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
@@ -410,22 +387,18 @@ export const main = (t: TemplateTranslations) => `
 
         <!-- Enhanced Loading Overlay -->
         <div x-show="isLoading"
-             x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0"
-             x-transition:enter-end="opacity-100"
-             x-transition:leave="transition ease-in duration-200"
-             x-transition:leave-start="opacity-100"
-             x-transition:leave-end="opacity-0"
-             class="fixed inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm z-50 flex items-center justify-center"
+                          x-transition:enter="loading-transition"
+             x-transition:enter-start="loading-start"
+             x-transition:enter-end="loading-end"
+             x-transition:leave="loading-transition"
+             x-transition:leave-start="loading-end"
+             x-transition:leave-end="loading-start"
+             class="fixed inset-0 loading-overlay z-50 flex items-center justify-center"
              x-cloak>
-            <div class="text-center">
-                <!-- Spinning Loader -->
-                <div class="relative w-20 h-20 mx-auto mb-4">
-                    <div class="absolute inset-0 border-4 border-blue-200 dark:border-blue-900 rounded-full"></div>
-                    <div class="absolute inset-0 border-4 border-transparent border-t-blue-500 rounded-full animate-spin"></div>
-                    <div class="absolute inset-2 border-4 border-transparent border-t-purple-500 rounded-full animate-spin" style="animation-duration: 1.5s; animation-direction: reverse;"></div>
-                </div>
-                <p class="text-gray-600 dark:text-gray-400 font-medium" x-text="loadingText || '${t.dashboard.loading}'"></p>
+            <div class="loading-pill" role="status" aria-live="polite">
+                <span class="loading-spinner" aria-hidden="true"></span>
+                <span class="font-medium" x-text="loadingText || '${t.dashboard.loading}'"></span>
+
             </div>
         </div>
     </div>

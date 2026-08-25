@@ -8,6 +8,7 @@ import { appAssetSource } from '../src/templates/appAsset';
 import { appCssAssetSource } from '../src/templates/appCssAsset';
 import { vendorAssetSource } from '../src/templates/vendorAsset';
 import { main } from '../src/templates/main';
+import { modals } from '../src/templates/modals';
 import { en } from '../src/locales/en';
 import { settingsSchema } from '../src/utils/schemas';
 
@@ -2008,6 +2009,9 @@ describe('web-bookmarks app', () => {
         expect(html).not.toContain('function app() {');
         expect(html).not.toContain('placeholder="admin"');
         expect(html).not.toContain('placeholder="••••••"');
+        expect((html.match(/loading-overlay/g) ?? []).length).toBe(1);
+        expect(html).not.toContain('animate-spin');
+        expect(html).not.toContain('bg-black bg-opacity-50 z-[60]');
     });
 
     it('generated app asset is syntactically valid and fully expanded', () => {
@@ -2021,16 +2025,23 @@ describe('web-bookmarks app', () => {
     it('renders unified folder navigation loading feedback', () => {
         const rendered = main({ ...en, lang: 'en' });
         expect(rendered).toContain('Folder Navigation Loading Overlay');
-        expect(rendered).toContain('folder-nav-spinner');
-        expect(rendered).toContain('x-transition:enter="folder-nav-transition"');
+        expect(rendered).toContain('loading-spinner');
+        expect(rendered).toContain('x-transition:enter="loading-transition"');
         expect(rendered).not.toContain('animate-pulse');
+    });
+
+    it('uses one consistent UI transition for modals and selectors', () => {
+        const rendered = modals({ ...en, lang: 'en' });
+        expect(rendered).toContain('x-transition:enter="ui-transition"');
+        expect(rendered).not.toContain('x-transition.opacity');
+        expect(rendered).not.toContain('x-transition>');
     });
 
     it('generated css asset is fully expanded', () => {
         expect(appCssAssetSource.length).toBeGreaterThan(0);
         expect(appCssAssetSource).not.toContain('@tailwind');
-        expect(appCssAssetSource).toContain('.folder-nav-spinner');
-        expect(appCssAssetSource).toContain('@keyframes folder-nav-spin');
+        expect(appCssAssetSource).toContain('.loading-spinner');
+        expect(appCssAssetSource).toContain('@keyframes loading-spinner-rotate');
         expect(appCssAssetSource).toContain('animation-iteration-count:infinite');
         expect(appCssAssetSource).toContain('animation-play-state:running');
     });
@@ -3755,7 +3766,7 @@ describe('web-bookmarks app', () => {
             expect(clientApp.folders).toEqual([{ id: 2, parent_id: null }]);
 
             pendingResponses[0]({ status: 401, ok: false, text: async () => '' });
-            await expect(staleLoad).rejects.toThrow('Unauthorized');
+            await expect(staleLoad).resolves.toBe(false);
             expect(clientApp.loggedIn).toBe(true);
             expect(clientApp.folders).toEqual([{ id: 2, parent_id: null }]);
         } finally {

@@ -56,31 +56,56 @@ a:focus-visible,
     }
 }
 
-/* Unified folder-navigation motion. Keep the loading indicator independent from utility classes. */
-@keyframes folder-nav-spin {
+/* Unified loading indicator. Keep live progress independent from utility classes. */
+@keyframes loading-spinner-rotate {
     to { transform: rotate(360deg); }
 }
 
-.folder-nav-spinner {
+.loading-spinner {
     display: inline-block;
+    flex: 0 0 auto;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 2px solid rgba(96, 165, 250, 0.22);
+    border-top-color: #60a5fa;
+    border-radius: 9999px;
     transform-origin: center;
-    animation: folder-nav-spin 900ms linear infinite;
+    animation: loading-spinner-rotate 900ms linear infinite;
+    animation-play-state: running;
     will-change: transform;
 }
 
-.folder-nav-transition {
-    transition: opacity 180ms cubic-bezier(0.23, 1, 0.32, 1),
-        transform 180ms cubic-bezier(0.23, 1, 0.32, 1);
+.loading-overlay {
+    background: rgba(8, 15, 30, 0.72);
+    backdrop-filter: blur(4px);
 }
 
-.folder-nav-start {
+.loading-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 3rem;
+    padding: 0.625rem 1rem;
+    color: #e5e7eb;
+    background: rgba(30, 41, 59, 0.92);
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: 9999px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.loading-transition,
+.ui-transition {
+    transition: opacity 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.loading-start,
+.ui-transition-start {
     opacity: 0;
-    transform: translateY(6px);
 }
 
-.folder-nav-end {
+.loading-end,
+.ui-transition-end {
     opacity: 1;
-    transform: translateY(0);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -95,8 +120,8 @@ a:focus-visible,
 
     /* A live loading indicator must remain animated so users can tell that
        the request is still active; decorative transitions above still reduce. */
-    .folder-nav-spinner {
-        animation: folder-nav-spin 900ms linear infinite !important;
+    .loading-spinner {
+        animation: loading-spinner-rotate 900ms linear infinite !important;
         animation-duration: 900ms !important;
         animation-iteration-count: infinite !important;
         animation-play-state: running !important;
