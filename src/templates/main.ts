@@ -206,8 +206,28 @@ export const main = (t: TemplateTranslations) => `
                 </div>
 
                 </div>
-                <div class="flex-1 overflow-y-auto px-4 sm:px-8 pb-8">
+                                <div class="flex-1 overflow-y-auto px-4 sm:px-8 pb-8 relative">
+                    <!-- Folder Navigation Loading Overlay -->
+                    <div x-show="isFolderLoading && currentView === 'home' && !searchQuery"
+                         x-cloak
+                         role="status"
+                         aria-live="polite"
+                         aria-busy="true"
+                         class="absolute inset-0 z-10 flex items-start justify-center pt-8 pointer-events-none bg-gray-50/65 dark:bg-gray-900/65 backdrop-blur-[1px]"
+                         x-transition:enter="transition-opacity ease-out duration-150"
+                         x-transition:enter-start="opacity-0"
+                         x-transition:enter-end="opacity-100"
+                         x-transition:leave="transition-opacity ease-in duration-150"
+                         x-transition:leave-start="opacity-100"
+                         x-transition:leave-end="opacity-0">
+                        <div class="flex items-center gap-3 rounded-full bg-white/95 dark:bg-gray-800/95 px-4 py-2.5 shadow-lg ring-1 ring-gray-200 dark:ring-gray-700">
+                            <span class="h-5 w-5 rounded-full border-2 border-blue-200 dark:border-blue-900 border-t-blue-600 dark:border-t-blue-400 animate-spin" aria-hidden="true"></span>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-200">${t.dashboard.loading}</span>
+                        </div>
+                    </div>
+
                     <!-- Folders Grid -->
+
                     <div x-show="currentFolders.length > 0" class="mb-8"
                          x-transition:enter="transition ease-out duration-300"
                          x-transition:enter-start="opacity-0 transform scale-95"
@@ -300,8 +320,12 @@ export const main = (t: TemplateTranslations) => `
                         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
                              @dragover.prevent="handleDragOver($event, 'bookmark')"
                              @drop="handleDrop($event, 'bookmark')">
-                            <template x-for="bookmark in currentBookmarks" :key="bookmark.id">
+                                                                <template x-for="bookmark in currentBookmarks" :key="bookmark.id">
                                 <div class="group relative bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm hover:shadow-md border-2 border-gray-100 dark:border-gray-700 transition-all duration-200 bookmark-item"
+                                     x-transition:enter="transition ease-out duration-200"
+                                     x-transition:enter-start="opacity-0 transform translate-y-2 scale-95"
+                                     x-transition:enter-end="opacity-100 transform translate-y-0 scale-100"
+
                                      :draggable="isSorting && currentView === 'home' && !searchQuery"
                                      @dragstart="handleDragStart($event, bookmark, 'bookmark')"
                                      @dragend="handleDragEnd($event)"

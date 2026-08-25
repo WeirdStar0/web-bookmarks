@@ -65,6 +65,8 @@ async loadData() {
     const folderId = this.currentFolderId;
     const isFolderNavigation = this.loggedIn && this.currentView === 'home' && !this.searchQuery;
     const folderQuery = folderId ? `?folderId=${encodeURIComponent(folderId)}` : '';
+    const loadingStartedAt = isFolderNavigation ? Date.now() : 0;
+    const minimumLoadingMs = 220;
 
     if (isFolderNavigation) this.isFolderLoading = true;
 
@@ -103,7 +105,13 @@ async loadData() {
         return false;
     } finally {
         if (isFolderNavigation && requestVersion === this._dataLoadVersion) {
-            this.isFolderLoading = false;
+            const remainingMs = Math.max(0, minimumLoadingMs - (Date.now() - loadingStartedAt));
+            if (remainingMs > 0) {
+                await new Promise(resolve => setTimeout(resolve, remainingMs));
+            }
+            if (requestVersion === this._dataLoadVersion) {
+                this.isFolderLoading = false;
+            }
         }
     }
 },
