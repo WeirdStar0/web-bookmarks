@@ -65,6 +65,7 @@ t: window.translations,
 	_sidebarDirty: true,
 							_dataLoadVersion: 0,
 				_loadedFolderId: null,
+				_folderLoadingTimer: null,
 
 			_trashLoadVersion: 0,
 			_authCheckVersion: 0,

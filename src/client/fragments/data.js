@@ -12,11 +12,26 @@ init() {
     this.$watch('currentView', value => {
         localStorage.setItem('currentView', value);
         this.scheduleSearch();
-        if (this.loggedIn && value === 'home' && !this.searchQuery) {
+        if (value !== 'home' || this.searchQuery) {
+            this._dataLoadVersion++;
+            this.clearFolderLoading();
+            return;
+        }
+        if (this.loggedIn) {
             void this.loadData();
         }
     });
-    this.$watch('searchQuery', () => this.scheduleSearch());
+    this.$watch('searchQuery', () => {
+        this.scheduleSearch();
+        if (this.loggedIn && this.currentView === 'home') {
+            if (this.searchQuery.trim()) {
+                this._dataLoadVersion++;
+                this.clearFolderLoading();
+            } else {
+                void this.loadData();
+            }
+        }
+    });
 },
 
 async checkAuth() {
@@ -106,12 +121,13 @@ async loadData() {
     } finally {
         if (isFolderNavigation && requestVersion === this._dataLoadVersion) {
             const remainingMs = Math.max(0, minimumLoadingMs - (Date.now() - loadingStartedAt));
-            if (remainingMs > 0) {
-                await new Promise(resolve => setTimeout(resolve, remainingMs));
-            }
-            if (requestVersion === this._dataLoadVersion) {
-                this.isFolderLoading = false;
-            }
+            if (this._folderLoadingTimer) clearTimeout(this._folderLoadingTimer);
+            this._folderLoadingTimer = setTimeout(() => {
+                if (requestVersion === this._dataLoadVersion) {
+                    this.isFolderLoading = false;
+                }
+                this._folderLoadingTimer = null;
+            }, remainingMs);
         }
     }
 },

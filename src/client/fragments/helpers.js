@@ -1,4 +1,7 @@
 clearSessionState() {
+    this._dataLoadVersion++;
+    this._searchRequestVersion++;
+    this.clearFolderLoading();
     this.loggedIn = false;
     this.folders = [];
     this.bookmarks = [];
@@ -9,6 +12,14 @@ clearSessionState() {
 handleUnauthorized() {
     this.clearSessionState();
     this.loginError = '';
+},
+
+clearFolderLoading() {
+    if (this._folderLoadingTimer) {
+        clearTimeout(this._folderLoadingTimer);
+        this._folderLoadingTimer = null;
+    }
+    this.isFolderLoading = false;
 },
 
     async apiFetch(url, options = {}) {

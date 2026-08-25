@@ -1961,6 +1961,9 @@ describe('web-bookmarks app', () => {
         expect(source).toContain("window.translations.toast.processing");
         expect(source).toContain('isFolderLoading');
         expect(source).toContain('minimumLoadingMs');
+        expect(source).toContain('clearFolderLoading()');
+        expect(source).toContain('this._folderLoadingTimer = setTimeout');
+        expect(source).toContain('this._dataLoadVersion++');
         expect(source).toContain('void this.loadData();');
         expect(source).toContain('handleUnauthorized()');
         expect(source).toContain('if (response.status === 401)');
@@ -2012,6 +2015,7 @@ describe('web-bookmarks app', () => {
         expect(() => new Function(appAssetSource)).not.toThrow();
         expect(appAssetSource).toContain('x-show="!isFolderLoading && currentBookmarks.length > 0"');
         expect(appAssetSource).toContain('Folder Navigation Loading Overlay');
+        expect(appAssetSource).toContain('clearFolderLoading()');
         expect(appAssetSource).toContain('role="status"');
     });
 
