@@ -16,11 +16,22 @@ export async function authMiddleware(c: Context<{ Bindings: Bindings; Variables:
 
     const secret = c.get('sessionSecret');
     const cookie = await getSignedCookie(c, secret, 'auth');
-    const currentSessionVersion = await getSessionVersion(c.env.DB);
+    if (!cookie) {
+        return c.json(err(ErrCode.UNAUTHORIZED, 'Unauthorized'), 401);
+    }
+    const isHotRead = c.req.method === 'GET' && (url.pathname === '/api/data' || url.pathname === '/api/search');
+    if (isHotRead) {
+        c.set('sessionVersionCookie', cookie);
+        c.set('sessionVersionPromise', getSessionVersion(c.env.DB));
+        await next();
+        return;
+    }
 
+    const currentSessionVersion = await getSessionVersion(c.env.DB);
     if (cookie !== currentSessionVersion) {
         return c.json(err(ErrCode.UNAUTHORIZED, 'Unauthorized'), 401);
     }
 
     await next();
+
 }

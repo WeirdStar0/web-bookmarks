@@ -15,4 +15,6 @@ export interface Bindings {
 
 export interface Variables {
     sessionSecret: string;
+    sessionVersionCookie?: string;
+    sessionVersionPromise?: Promise<string>;
 }

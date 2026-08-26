@@ -1,6 +1,6 @@
 import type { ApiApp } from './types';
 import { bookmarkSchema, folderSchema, idSchema } from '../utils/schemas';
-import { err, ErrCode } from '../utils/common';
+import { err, ErrCode, getSessionVersion } from '../utils/common';
 
 const MAX_SEARCH_QUERY_LENGTH = 200;
 const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
@@ -181,16 +181,20 @@ export function registerImportExportRoutes(app: ApiApp) {
         if (requestedFolder && requestedFolder !== 'root') {
             const folderResult = idSchema.safeParse(requestedFolder);
             if (!folderResult.success) return c.json(err(ErrCode.INVALID_ID, 'Invalid folder ID'), 400);
-            const folder = await c.env.DB.prepare('SELECT id FROM folders WHERE id = ? AND is_deleted = 0')
-                .bind(folderResult.data)
-                .first<{ id: number }>();
-            if (!folder) return c.json(err(ErrCode.NOT_FOUND, 'Folder not found'), 404);
-            folderId = folder.id;
+            folderId = folderResult.data;
         }
 
+        const sessionVersionCookie = c.get('sessionVersionCookie');
+        const sessionVersionPromise = c.get('sessionVersionPromise') || getSessionVersion(c.env.DB);
         const foldersPromise = c.env.DB.prepare(`SELECT ${FOLDER_PUBLIC_COLUMNS} FROM folders WHERE is_deleted = 0 ORDER BY sort_order ASC, name ASC`).all();
+        const [sessionVersion, { results: folders }] = await Promise.all([sessionVersionPromise, foldersPromise]);
+        if (!sessionVersionCookie || sessionVersionCookie !== sessionVersion) {
+            return c.json(err(ErrCode.UNAUTHORIZED, 'Unauthorized'), 401);
+        }
+        if (folderId !== null && !folders.some((folder) => Number(folder.id) === folderId)) {
+            return c.json(err(ErrCode.NOT_FOUND, 'Folder not found'), 404);
+        }
         if (!includeBookmarks) {
-            const { results: folders } = await foldersPromise;
             return c.json({ folders, bookmarks: [], bookmarkCounts: {} });
         }
 
@@ -202,10 +206,9 @@ export function registerImportExportRoutes(app: ApiApp) {
         ).all<{ folder_id: number; count: number }>();
 
         const [
-            { results: folders },
             { results: bookmarks },
             { results: countRows },
-        ] = await Promise.all([foldersPromise, bookmarksPromise, bookmarkCountsPromise]);
+        ] = await Promise.all([bookmarksPromise, bookmarkCountsPromise]);
 
         const bookmarkCounts: Record<string, number> = {};
         for (const row of countRows) bookmarkCounts[String(row.folder_id)] = Number(row.count);
@@ -225,12 +228,22 @@ export function registerImportExportRoutes(app: ApiApp) {
         const escaped = query.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 
         const pattern = `%${escaped}%`;
-        const { results: folders } = await c.env.DB.prepare(
+        const sessionVersionCookie = c.get('sessionVersionCookie');
+        const sessionVersionPromise = c.get('sessionVersionPromise') || getSessionVersion(c.env.DB);
+        const foldersPromise = c.env.DB.prepare(
             `SELECT ${FOLDER_PUBLIC_COLUMNS} FROM folders WHERE is_deleted = 0 AND name LIKE ? ESCAPE '\\' ORDER BY sort_order ASC, name ASC LIMIT 50`,
         ).bind(pattern).all();
-        const { results: bookmarks } = await c.env.DB.prepare(
+        const bookmarksPromise = c.env.DB.prepare(
             `SELECT ${BOOKMARK_PUBLIC_COLUMNS} FROM bookmarks WHERE is_deleted = 0 AND (title LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\') ORDER BY sort_order ASC, created_at DESC LIMIT 50`,
         ).bind(pattern, pattern, pattern).all();
+        const [sessionVersion, { results: folders }, { results: bookmarks }] = await Promise.all([
+            sessionVersionPromise,
+            foldersPromise,
+            bookmarksPromise,
+        ]);
+        if (!sessionVersionCookie || sessionVersionCookie !== sessionVersion) {
+            return c.json(err(ErrCode.UNAUTHORIZED, 'Unauthorized'), 401);
+        }
 
         return c.json({ folders, bookmarks });
     });
