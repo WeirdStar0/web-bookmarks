@@ -87,6 +87,7 @@ export const en = {
         confirm: "Confirm",
         leaveEmptyToKeep: "Leave empty to keep unchanged",
         rootFolder: "All Bookmarks (Root)",
+        searchFolders: "Search folders...",
         unknownFolder: "Unknown Folder",
         confirmDeleteFolderGeneric: "Are you sure you want to delete this folder?",
         confirmDeleteBookmarkGeneric: "Are you sure you want to delete this bookmark?",

@@ -86,6 +86,7 @@ export const pt = {
         confirm: "Confirmar",
         leaveEmptyToKeep: "Deixar vazio para manter",
         rootFolder: "Todos os favoritos (Raiz)",
+        searchFolders: "Pesquisar pastas...",
         unknownFolder: "Pasta desconhecida",
         confirmDeleteFolderGeneric: "Tem certeza de que deseja excluir esta pasta?",
         confirmDeleteBookmarkGeneric: "Tem certeza de que deseja excluir este favorito?",

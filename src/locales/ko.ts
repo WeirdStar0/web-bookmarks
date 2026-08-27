@@ -86,6 +86,7 @@ export const ko = {
         confirm: "확인",
         leaveEmptyToKeep: "변경하지 않으려면 비워 두세요",
         rootFolder: "모든 북마크 (루트)",
+        searchFolders: "폴더 검색...",
         unknownFolder: "알 수 없는 폴더",
         confirmDeleteFolderGeneric: "이 폴더를 삭제하시겠습니까?",
         confirmDeleteBookmarkGeneric: "이 북마크를 삭제하시겠습니까?",

@@ -38,7 +38,9 @@ async checkAuth() {
     const authCheckVersion = ++this._authCheckVersion;
     const wasLoggedIn = this.loggedIn;
     try {
-        await this.loadData();
+        // Boot load: surface 401 so a stale/invalid session flips the UI back
+        // to the login form instead of being misread as a failed navigation.
+        await this.loadData({ asBootLoad: true });
         if (this.currentView === 'trash') {
             await this.loadTrash();
         }
@@ -75,10 +77,17 @@ async withLoading(fn) {
     }
 },
 
-async loadData() {
+async loadData(options = {}) {
     const requestVersion = ++this._dataLoadVersion;
     const folderId = this.currentFolderId;
-    const isFolderNavigation = this.loggedIn && this.currentView === 'home' && !this.searchQuery;
+    // A boot load (initial load after login, or checkAuth) must not be treated
+    // as folder navigation: it has to surface failures, in particular a 401
+    // right after login, so the caller can report the error instead of
+    // silently dropping the user back to an empty login form.
+    const isFolderNavigation = !options.asBootLoad
+        && this.loggedIn
+        && this.currentView === 'home'
+        && !this.searchQuery;
     const folderQuery = folderId ? `?folderId=${encodeURIComponent(folderId)}` : '';
     const loadingStartedAt = isFolderNavigation ? Date.now() : 0;
     // Keep the indicator visible for a few frames without adding a

@@ -86,6 +86,7 @@ export const zhtw = {
         confirm: "確定",
         leaveEmptyToKeep: "不修改請留空",
         rootFolder: "所有書籤 (根目錄)",
+        searchFolders: "搜尋資料夾...",
         unknownFolder: "未知資料夾",
         confirmDeleteFolderGeneric: "確定要刪除此資料夾嗎？",
         confirmDeleteBookmarkGeneric: "確定要刪除此書籤嗎？",

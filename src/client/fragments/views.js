@@ -1,3 +1,13 @@
+escapeHtml(unsafe) {
+    if (!unsafe) return '';
+    return String(unsafe)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+},
+
 get currentFolders() {
     if (this.currentView === 'trash') {
         return this.trashFolders.filter(f => f.name.toLowerCase().includes(this.searchQuery.toLowerCase()));
@@ -50,7 +60,6 @@ getFolderBookmarkCount(folderId) {
 },
 
 get flattenedFolders() {
-    const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     const buildHierarchy = (parentId = null, level = 0) => {
         const children = this.folders.filter(f => f.parent_id === parentId);
         children.sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
@@ -60,7 +69,6 @@ get flattenedFolders() {
             result.push({
                 ...child,
                 level: level,
-                displayName: '\u00A0'.repeat(level * 4) + escape(child.name),
             });
             result = result.concat(buildHierarchy(child.id, level + 1));
         }
@@ -73,15 +81,6 @@ get sidebarHtml() {
     if (!this._sidebarDirty && this._sidebarCache !== null) {
         return this._sidebarCache;
     }
-    const escapeHtml = (unsafe) => {
-        if (!unsafe) return '';
-        return unsafe
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    };
 
     const renderFolder = (folder, level = 0) => {
         const isExpanded = this.expandedFolders[folder.id];
@@ -148,6 +147,57 @@ getFolderName(id) {
     if (!id) return window.translations?.modals?.rootFolder ?? 'Root';
     const folder = this.folders.find(f => f.id === id);
     return folder ? folder.name : (window.translations?.modals?.unknownFolder ?? 'Unknown');
+},
+
+/**
+ * Render the folder picker options. `targetField` is the component field the
+ * selection writes to ('newFolderParentId' for the folder modal,
+ * 'newBookmarkFolderId' for the bookmark modal) and is supplied explicitly by
+ * the caller so both pickers stay independent even when both modals are open.
+ *
+ * The folder name is never embedded into an Alpine expression. It is placed
+ * as HTML-escaped text inside a plain <span>, so a folder name containing
+ * quotes or script syntax cannot be executed.
+ */
+folderSelectorTemplate(targetField, editingId) {
+    const query = (this.selectorQuery || '').trim().toLowerCase();
+    const canBeParent = (folder) =>
+        editingId === null || (folder.id !== editingId && !this.isFolderDescendant(folder.id, editingId));
+
+    const build = (parentId, depth = 0) => {
+        let children = this.folders.filter(f => f.parent_id === parentId);
+        children.sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
+
+        let html = '';
+        for (const folder of children) {
+            const matches = !query || folder.name.toLowerCase().includes(query);
+            const childHtml = build(folder.id, depth + 1);
+            if (!matches && !childHtml) continue;
+
+            const selectable = canBeParent(folder);
+            const classes = 'block w-full text-left pr-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm truncate'
+                + (selectable ? '' : ' opacity-40 cursor-not-allowed');
+            const clickHandler = selectable
+                ? `@click="selectFolderOption($event, '${targetField}')"`
+                : '';
+            const padding = 16 + depth * 16;
+
+            html += `<button type="button" role="option" data-folder-id="${folder.id}" ${clickHandler} :aria-selected="${targetField} === ${folder.id}" style="padding-left: ${padding}px" class="${classes}" ${selectable ? '' : 'disabled'}>`;
+            html += `<span>${this.escapeHtml(folder.name)}</span>`;
+            html += '</button>';
+            html += childHtml;
+        }
+        return html;
+    };
+
+    return build(null);
+},
+
+selectFolderOption(event, targetField) {
+    const row = event.currentTarget;
+    this[targetField] = Number(row.dataset.folderId);
+    this.selectorOpen = false;
+    this.selectorQuery = '';
 },
 
 isFolderDescendant(folderId, ancestorId) {

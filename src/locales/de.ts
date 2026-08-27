@@ -86,6 +86,7 @@ export const de = {
         confirm: "Bestätigen",
         leaveEmptyToKeep: "Leer lassen zum Beibehalten",
         rootFolder: "Alle Lesezeichen (Root)",
+        searchFolders: "Ordner suchen...",
         unknownFolder: "Unbekannter Ordner",
         confirmDeleteFolderGeneric: "Sind Sie sicher, dass Sie diesen Ordner löschen möchten?",
         confirmDeleteBookmarkGeneric: "Sind Sie sicher, dass Sie dieses Lesezeichen löschen möchten?",

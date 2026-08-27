@@ -86,6 +86,7 @@ export const it = {
         confirm: "Conferma",
         leaveEmptyToKeep: "Lascia vuoto per mantenere",
         rootFolder: "Tutti i preferiti (Radice)",
+        searchFolders: "Cerca cartelle...",
         unknownFolder: "Cartella sconosciuta",
         confirmDeleteFolderGeneric: "Sei sicuro di voler eliminare questa cartella?",
         confirmDeleteBookmarkGeneric: "Sei sicuro di voler eliminare questo preferito?",

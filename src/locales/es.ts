@@ -86,6 +86,7 @@ export const es = {
         confirm: "Confirmar",
         leaveEmptyToKeep: "Dejar vacío para mantener",
         rootFolder: "Todos los marcadores (Raíz)",
+        searchFolders: "Buscar carpetas...",
         unknownFolder: "Carpeta desconocida",
         confirmDeleteFolderGeneric: "¿Está seguro de que desea eliminar esta carpeta?",
         confirmDeleteBookmarkGeneric: "¿Está seguro de que desea eliminar este marcador?",

@@ -87,6 +87,7 @@ export const zh = {
         confirm: "确定",
         leaveEmptyToKeep: "不修改请留空",
         rootFolder: "所有书签 (根目录)",
+        searchFolders: "搜索文件夹...",
         unknownFolder: "未知文件夹",
         confirmDeleteFolderGeneric: "确定要删除这个文件夹吗？",
         confirmDeleteBookmarkGeneric: "确定要删除这个书签吗？",

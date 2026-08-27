@@ -86,6 +86,7 @@ export const fr = {
         confirm: "Confirmer",
         leaveEmptyToKeep: "Laisser vide pour conserver",
         rootFolder: "Tous les favoris (Racine)",
+        searchFolders: "Rechercher des dossiers...",
         unknownFolder: "Dossier inconnu",
         confirmDeleteFolderGeneric: "Êtes-vous sûr de vouloir supprimer ce dossier ?",
         confirmDeleteBookmarkGeneric: "Êtes-vous sûr de vouloir supprimer ce favori ?",

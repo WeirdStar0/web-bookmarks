@@ -3,9 +3,28 @@ async login() {
     this.loadingText = window.translations.toast.loggingIn;
     try {
         const res = await this.submitJson('/api/login', this.loginForm);
+        // A successful login response already established the server session.
+        // A subsequent loadData failure (e.g. transient network error) must
+        // not flip the authenticated state back, which would leave the UI
+        // showing a login form while the browser holds a valid session.
         this.loggedIn = true;
         this.loginError = '';
-        await this.loadData();
+        try {
+            // Boot load: not folder navigation, so a 401 from /api/data right
+            // after a successful login is rethrown and lands in the catch
+            // below instead of being swallowed as a failed navigation.
+            await this.loadData({ asBootLoad: true });
+        } catch (loadError) {
+            if (loadError?.message === 'Unauthorized') {
+                throw loadError;
+            }
+            // The session is already established, but the initial data could
+            // not be fetched (network error, timeout...). Do not silently show
+            // a logged-in-but-empty page: surface the failure so the user can
+            // retry (e.g. by clicking a folder) instead of assuming it loaded.
+            console.error('Initial data load after login failed:', loadError);
+            this.showToast(loadError?.message || window.translations.toast.networkError, 'error');
+        }
     } catch (e) {
         this.loggedIn = false;
         this.loginError = e.message || window.translations.toast.loginFailed;
@@ -44,6 +63,7 @@ openFolderModal(folder = null) {
     }
     this.selectorExpanded = {};
     this.selectorOpen = false;
+    this.selectorQuery = '';
     this.showFolderModal = true;
 },
 
@@ -86,6 +106,7 @@ openBookmarkModal(bookmark = null) {
     }
     this.selectorExpanded = {};
     this.selectorOpen = false;
+    this.selectorQuery = '';
     this.showBookmarkModal = true;
 },
 
@@ -170,37 +191,37 @@ openSettingsModal() {
     this.showSettingsModal = true;
 },
 
-    async updateSettings() {
-        await this.withLoading(async () => {
-            const nextUsername = this.settingsForm.username;
-            const nextPassword = this.settingsForm.password;
-            const payload = {};
-            if (nextUsername) payload.username = nextUsername;
-            if (nextPassword) payload.password = nextPassword;
-            if (Object.keys(payload).length === 0) {
-                this.showToast(window.translations.toast.operationFailed, 'error');
-                return;
-            }
-            const credentialsChanged = Boolean(nextUsername || nextPassword);
-            try {
-                await this.submitJson('/api/settings', payload, 'PUT');
-                this.closeModal('showSettingsModal');
-                this.settingsForm = { username: '', password: '' };
-                this.showToast(window.translations.toast.settingsUpdated, 'success');
+async updateSettings() {
+    await this.withLoading(async () => {
+        const nextUsername = this.settingsForm.username;
+        const nextPassword = this.settingsForm.password;
+        const payload = {};
+        if (nextUsername) payload.username = nextUsername;
+        if (nextPassword) payload.password = nextPassword;
+        if (Object.keys(payload).length === 0) {
+            this.showToast(window.translations.toast.operationFailed, 'error');
+            return;
+        }
+        const credentialsChanged = Boolean(nextUsername || nextPassword);
+        try {
+            await this.submitJson('/api/settings', payload, 'PUT');
+            this.closeModal('showSettingsModal');
+            this.settingsForm = { username: '', password: '' };
+            this.showToast(window.translations.toast.settingsUpdated, 'success');
 
-                // The server rotates session_version when account credentials
-                // change, so the current Cookie is intentionally no longer
-                // authorized. Reflect that immediately instead of leaving the
-                // dashboard visible until its next API call fails.
-                if (credentialsChanged) {
-                    this.handleUnauthorized();
-                    this.loginForm = { username: nextUsername || '', password: '' };
-                }
-            } catch (e) {
-                this.showToast(e.message || window.translations.toast.updateFailed, 'error');
+            // The server rotates session_version when account credentials
+            // change, so the current Cookie is intentionally no longer
+            // authorized. Reflect that immediately instead of leaving the
+            // dashboard visible until its next API call fails.
+            if (credentialsChanged) {
+                this.handleUnauthorized();
+                this.loginForm = { username: nextUsername || '', password: '' };
             }
-        });
-    },
+        } catch (e) {
+            this.showToast(e.message || window.translations.toast.updateFailed, 'error');
+        }
+    });
+},
 
 toggleDarkMode() {
     this.darkMode = !this.darkMode;

@@ -45,6 +45,7 @@ newBookmarkDescription: '',
 newBookmarkFolderId: null,
 selectorExpanded: {},
 selectorOpen: false,
+selectorQuery: '',
 
 showSettingsModal: false,
 settingsForm: { username: '', password: '' },
@@ -61,14 +62,14 @@ isSorting: false,
 
 t: window.translations,
 
-	_sidebarCache: null,
-	_sidebarDirty: true,
-							_dataLoadVersion: 0,
-				_loadedFolderId: null,
-				_folderLoadingTimer: null,
+    _sidebarCache: null,
+    _sidebarDirty: true,
+    _dataLoadVersion: 0,
+    _loadedFolderId: null,
+    _folderLoadingTimer: null,
 
-			_trashLoadVersion: 0,
-			_authCheckVersion: 0,
-			_searchRequestVersion: 0,
-			_searchTimer: null,
-			_modalReturnFocus: null
+    _trashLoadVersion: 0,
+    _authCheckVersion: 0,
+    _searchRequestVersion: 0,
+    _searchTimer: null,
+    _modalReturnFocus: null

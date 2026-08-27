@@ -24,15 +24,14 @@ export const modals = (t: TemplateTranslations) => `
                         <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </button>
                     <div x-show="selectorOpen" role="listbox" aria-labelledby="folderParentSelect" class="absolute z-10 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto" x-transition:enter="ui-transition" x-transition:enter-start="ui-transition-start" x-transition:enter-end="ui-transition-end" x-transition:leave="ui-transition" x-transition:leave-start="ui-transition-end" x-transition:leave-end="ui-transition-start">
+                        <div class="p-2 border-b border-gray-200 dark:border-gray-600">
+                            <input type="text" x-model="selectorQuery" placeholder="${t.modals.searchFolders}" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent">
+                        </div>
                         <div class="py-1">
-                            <button type="button" role="option" :aria-selected="newFolderParentId === null" @click="newFolderParentId = null; selectorOpen = false" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm">
+                            <button type="button" role="option" :aria-selected="newFolderParentId === null" @click="newFolderParentId = null; selectorOpen = false; selectorQuery = ''" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm">
                                 ${t.modals.rootFolder}
                             </button>
-                            <template x-for="folder in flattenedFolders" :key="folder.id">
-                                <button type="button" role="option" x-show="editingId === null || (folder.id !== editingId && !isFolderDescendant(folder.id, editingId))" :aria-selected="newFolderParentId === folder.id" @click="newFolderParentId = folder.id; selectorOpen = false" :style="'padding-left: ' + (16 + folder.level * 16) + 'px'" class="block w-full text-left pr-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm truncate">
-                                    <span x-text="folder.name"></span>
-                                </button>
-                            </template>
+                            <div x-html="folderSelectorTemplate('newFolderParentId', editingId)"></div>
                         </div>
                     </div>
                 </div>
@@ -69,15 +68,14 @@ export const modals = (t: TemplateTranslations) => `
                             <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                         </button>
                         <div x-show="selectorOpen" role="listbox" aria-labelledby="bookmarkFolderSelect" class="absolute z-10 mt-1 w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto" x-transition:enter="ui-transition" x-transition:enter-start="ui-transition-start" x-transition:enter-end="ui-transition-end" x-transition:leave="ui-transition" x-transition:leave-start="ui-transition-end" x-transition:leave-end="ui-transition-start">
+                            <div class="p-2 border-b border-gray-200 dark:border-gray-600">
+                                <input type="text" x-model="selectorQuery" placeholder="${t.modals.searchFolders}" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent">
+                            </div>
                             <div class="py-1">
-                                <button type="button" role="option" :aria-selected="newBookmarkFolderId === null" @click="newBookmarkFolderId = null; selectorOpen = false" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm">
+                                <button type="button" role="option" :aria-selected="newBookmarkFolderId === null" @click="newBookmarkFolderId = null; selectorOpen = false; selectorQuery = ''" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm">
                                     ${t.modals.rootFolder}
                                 </button>
-                                <template x-for="folder in flattenedFolders" :key="folder.id">
-                                    <button type="button" role="option" :aria-selected="newBookmarkFolderId === folder.id" @click="newBookmarkFolderId = folder.id; selectorOpen = false" :style="'padding-left: ' + (16 + folder.level * 16) + 'px'" class="block w-full text-left pr-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm truncate">
-                                        <span x-text="folder.name"></span>
-                                    </button>
-                                </template>
+                                <div x-html="folderSelectorTemplate('newBookmarkFolderId', null)"></div>
                             </div>
                         </div>
                     </div>

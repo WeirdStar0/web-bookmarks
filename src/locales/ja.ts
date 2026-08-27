@@ -86,6 +86,7 @@ export const ja = {
         confirm: "確認",
         leaveEmptyToKeep: "変更しない場合は空欄",
         rootFolder: "すべてのブックマーク (ルート)",
+        searchFolders: "フォルダを検索...",
         unknownFolder: "不明なフォルダ",
         confirmDeleteFolderGeneric: "このフォルダを削除してもよろしいですか？",
         confirmDeleteBookmarkGeneric: "このブックマークを削除してもよろしいですか？",

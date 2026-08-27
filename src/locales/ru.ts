@@ -86,6 +86,7 @@ export const ru = {
         confirm: "Подтвердить",
         leaveEmptyToKeep: "Оставьте пустым чтобы не менять",
         rootFolder: "Все закладки (Корень)",
+        searchFolders: "Поиск папок...",
         unknownFolder: "Неизвестная папка",
         confirmDeleteFolderGeneric: "Вы уверены, что хотите удалить эту папку?",
         confirmDeleteBookmarkGeneric: "Вы уверены, что хотите удалить эту закладку?",
