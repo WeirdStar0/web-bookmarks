@@ -101,7 +101,7 @@ get sidebarHtml() {
         html += '</div>';
         html += '<div class="flex-1 flex items-center cursor-pointer overflow-hidden" data-action="select" data-id="' + folder.id + '">';
         html += '<svg class="w-5 h-5 mr-2 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>';
-        html += '<span class="truncate">' + escapeHtml(folder.name) + '</span>';
+        html += '<span class="truncate">' + this.escapeHtml(folder.name) + '</span>';
         html += '<span class="text-xs text-gray-400 ml-2">' + this.getFolderBookmarkCount(folder.id) + '</span>';
         html += '</div>';
         html += '</div>';

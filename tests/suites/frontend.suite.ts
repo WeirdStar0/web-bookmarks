@@ -166,6 +166,40 @@ describe('frontend', () => {
         expect(appAssetSource).toContain('this._dataLoadVersion++');
     });
 
+    it('renders folder names in the sidebar through the bound escape helper', () => {
+        const g = globalThis as Record<string, any>;
+        const store: Record<string, string> = {};
+        g.document = {
+            body: { dataset: {} },
+            documentElement: { classList: { add() {}, remove() {} } },
+        };
+        g.window = {
+            translations: {},
+            dispatchEvent: () => {},
+            addEventListener: () => {},
+        };
+        g.localStorage = {
+            getItem: (k: string) => store[k] ?? null,
+            setItem: (k: string, v: string) => { store[k] = String(v); },
+        };
+        g.Event = class Event { type: string; constructor(t: string) { this.type = t; } };
+
+        new Function(appAssetSource)();
+        const state = g.window.app() as Record<string, any>;
+        state.folders = [
+            { id: 1, name: 'Work & Notes', parent_id: null, sort_order: 0 },
+        ];
+        state.expandedFolders = {};
+        state.folderCounts = {};
+        state.currentFolderId = null;
+        state._sidebarCache = null;
+        state._sidebarDirty = true;
+
+        const html = state.sidebarHtml as string;
+        expect(html).toContain('Work &amp; Notes');
+        expect(html).not.toContain('undefined');
+    });
+
     it('renders unified folder navigation loading feedback', () => {
         const rendered = main({ ...en, lang: 'en' });
         expect(rendered).toContain('Folder Navigation Loading Overlay');
