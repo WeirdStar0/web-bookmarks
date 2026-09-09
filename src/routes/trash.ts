@@ -8,9 +8,7 @@ import {
 } from '../services/trash';
 import { err, ErrCode } from '../utils/common';
 import type { ApiApp } from './types';
-
-const FOLDER_PUBLIC_COLUMNS = 'id, name, parent_id, sort_order, is_deleted, created_at, updated_at';
-const BOOKMARK_PUBLIC_COLUMNS = 'id, title, url, description, folder_id, sort_order, is_deleted, created_at, updated_at';
+import { BOOKMARK_PUBLIC_COLUMNS, FOLDER_PUBLIC_COLUMNS } from './columns';
 
 export function registerTrashRoutes(app: ApiApp) {
     app.get('/trash', async (c) => {
