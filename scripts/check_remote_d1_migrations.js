@@ -4,7 +4,7 @@ const { execFileSync, execSync } = require('child_process');
 
 const rootDir = path.resolve(__dirname, '..');
 const migrationsDir = path.join(rootDir, 'migrations');
-const databaseBinding = 'bookmarks-db';
+const databaseBinding = 'DB';
 const requiredMigrations = fs.readdirSync(migrationsDir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
     .map((entry) => entry.name)
@@ -33,7 +33,7 @@ try {
         '--json',
     ];
     const output = process.platform === 'win32'
-        ? execSync('npx.cmd wrangler d1 execute bookmarks-db --remote --command "SELECT name FROM d1_migrations ORDER BY name;" --json', {
+        ? execSync(`npx.cmd wrangler d1 execute ${databaseBinding} --remote --command "SELECT name FROM d1_migrations ORDER BY name;" --json`, {
             cwd: rootDir,
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe'],

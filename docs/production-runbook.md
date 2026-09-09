@@ -17,7 +17,7 @@ node scripts/check_production_config.js
 Before a schema change, create a database backup using the Cloudflare Dashboard or the Wrangler D1 export command supported by the installed Wrangler version. Store the export outside the Git repository and record its timestamp and database name.
 
 ```bash
-npx wrangler d1 export bookmarks-db --remote --output ./bookmarks-backup.sql
+npx wrangler d1 export DB --remote --output ./bookmarks-backup.sql
 ```
 
 If the installed Wrangler version does not support this exact export syntax, stop and use the Dashboard export/backup flow instead of guessing a destructive command.
@@ -40,11 +40,11 @@ Do not run `schema.sql` and `db:migrate:remote` against the same new database un
 Never run `npm run db:init:remote` or upload `schema.sql` to an existing production database. First inspect the migration ledger and schema:
 
 ```bash
-npx wrangler d1 execute bookmarks-db --remote --command \
+npx wrangler d1 execute DB --remote --command \
   "SELECT name FROM d1_migrations ORDER BY name;"
-npx wrangler d1 execute bookmarks-db --remote --command \
+npx wrangler d1 execute DB --remote --command \
   "SELECT type, name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name;"
-npx wrangler d1 execute bookmarks-db --remote --command \
+npx wrangler d1 execute DB --remote --command \
   "SELECT COALESCE(parent_id, 0) AS parent_key, name, COUNT(*) AS active_count, GROUP_CONCAT(id) AS folder_ids FROM folders WHERE is_deleted = 0 GROUP BY COALESCE(parent_id, 0), name HAVING COUNT(*) > 1;"
 ```
 
