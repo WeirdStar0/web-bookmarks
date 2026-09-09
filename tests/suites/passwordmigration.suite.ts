@@ -86,6 +86,26 @@ describe('passwordmigration', () => {
         expect(db.settings.get('password')).toBe(storedValue);
     });
 
+    it('fails closed cleanly on stored hashes claiming more than 100k iterations', async () => {
+        const db = env.DB as unknown as MockD1Database;
+        const salt = '0123456789abcdef0123456789abcdef';
+        const hash = 'a'.repeat(64);
+        db.settings.set('username', 'admin');
+
+        // workerd rejects PBKDF2 derivations above 100k, so such hashes can
+        // never be verified; the parsers must reject them before derivation
+        // instead of surfacing a 500 from deriveBits.
+        db.settings.set('password', `v3:100001:${salt}:${hash}`);
+        const v3Response = await postLogin(env, TEST_INITIAL_ADMIN_PASSWORD);
+        expect(v3Response.status).toBe(401);
+        expect(await v3Response.json()).toMatchObject({ error: 'INVALID_CREDENTIALS' });
+
+        db.settings.set('password', `v4:k1:100001:${salt}:${hash}`);
+        const v4Response = await postLogin(env, TEST_INITIAL_ADMIN_PASSWORD);
+        expect(v4Response.status).toBe(401);
+        expect(await v4Response.json()).toMatchObject({ error: 'INVALID_CREDENTIALS' });
+    });
+
     it('aborts a legacy v1 login when the stored credential changed concurrently', async () => {
         const db = env.DB as unknown as MockD1Database;
         const legacyPassword = 'legacy-password-2026';

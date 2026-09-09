@@ -16,6 +16,11 @@ type SettingsRow = {
 // the pepper (when configured), and the single-account threat model remain
 // the primary compensations.
 export const PASSWORD_HASH_ITERATIONS = 90_000;
+// Production workerd rejects PBKDF2 derivations above 100k iterations
+// (cloudflare/workerd#1346), so stored hashes claiming more can never be
+// verified; the parsers treat them as invalid instead of 500-ing inside
+// deriveBits.
+const PASSWORD_HASH_ITERATIONS_MAX = 100_000;
 const MIN_PEPPER_MATERIAL_LENGTH = 32;
 
 // V1: SHA-256 (legacy only; migrate after a successful login)
@@ -55,8 +60,10 @@ export function parsePasswordHashV3(value: string): { iterations: number; salt: 
     const hash = parts[3];
     // The lower bound admits historical installs whose hashes were created
     // before the work factor was tuned for the Workers Free plan; the upper
-    // bound keeps a malformed value from forcing an expensive derivation.
-    if (!Number.isSafeInteger(iterations) || iterations < 1000 || iterations > 2000000) return null;
+    // bound matches the workerd derivation limit (see
+    // PASSWORD_HASH_ITERATIONS_MAX), turning unverifiable hashes into a clean
+    // verification failure.
+    if (!Number.isSafeInteger(iterations) || iterations < 1000 || iterations > PASSWORD_HASH_ITERATIONS_MAX) return null;
     if (!/^[0-9a-f]{32}$/i.test(salt) || !/^[0-9a-f]{64}$/i.test(hash)) return null;
 
     return { iterations, salt, hash };
@@ -111,7 +118,7 @@ export function parsePasswordHashV4(value: string): { pepperId: string; iteratio
     const salt = parts[3];
     const hash = parts[4];
     if (!/^[A-Za-z0-9]{1,16}$/.test(pepperId)) return null;
-    if (!Number.isSafeInteger(iterations) || iterations < 1000 || iterations > 2000000) return null;
+    if (!Number.isSafeInteger(iterations) || iterations < 1000 || iterations > PASSWORD_HASH_ITERATIONS_MAX) return null;
     if (!/^[0-9a-f]{32}$/i.test(salt) || !/^[0-9a-f]{64}$/i.test(hash)) return null;
 
     return { pepperId, iterations, salt, hash };
