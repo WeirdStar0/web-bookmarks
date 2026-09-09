@@ -44,20 +44,22 @@ variable, bounded to 25,000–100,000, defaulting to **25,000**.
 
 The Workers Free plan enforces a 10 ms CPU budget per HTTP invocation, and a
 migration login can run two derivations (verify at the stored factor plus the
-re-hash), plus the HMAC prehash. 25,000 is therefore the lowest-risk default:
-it matches the previous release's login cost, where a v1 migration performed a
-SHA-256 verification plus a single 25,000-iteration derivation. Real
-production Free-plan CPU accounting has not been benchmarked, and Cloudflare
-notes that sustained limit collisions terminate the Worker. Measured workerd
-timings (vitest-pool-workers, reference dev machine) are 25k = 5 ms,
-50k = 11 ms, 90k = 15 ms, 100k = 17 ms; they are reference data, not proof
-about production CPU accounting. Deployments on Paid plans — or that have
-verified their own budget — can opt into up to 100,000 (workerd rejects
-derivations above 100k, cloudflare/workerd#1346, and the parsers reject stored
-hashes claiming more). Malformed or out-of-range values fall back to the
-default. Stored hashes keep their own iteration count — and upgrades never
-lower a stored factor — so changing the variable migrates hashes lazily on
-login; login remains a rate-limited, per-attempt cost.
+re-hash), plus the HMAC prehash. **Production benchmark (2026-09-09, this
+deployment's Free plan, workers.dev; external wall-clock over in-request
+×1/×10/×20 loops, median-based slopes):** a single derivation measured
+≈ 6–8 ms at 25k, ≈ 13–28 ms at 90k, and ≈ 17–35 ms at 100k; a default-factor
+migration login (25k verify + 25k re-hash) ≈ 15 ms; a 90k v4 migration ≈ 19 ms;
+a v2 migration (100k verify + 100k re-hash) ≈ 45 ms. None of the ~50 requests —
+including multi-hundred-millisecond compute bursts — was CPU-terminated,
+consistent with the limit being enforced as an average with burst headroom
+rather than a hard per-request kill. The margin at higher factors is still
+thin and varies by colo, so the default remains 25,000 (the lowest-risk
+value), with up to 100,000 available as an opt-in (workerd rejects derivations
+above 100k, cloudflare/workerd#1346, and the parsers reject stored hashes
+claiming more). Malformed or out-of-range values fall back to the default.
+Stored hashes keep their own iteration count — and upgrades never lower a
+stored factor — so changing the variable migrates hashes lazily on login;
+login remains a rate-limited, per-attempt cost.
 
 ## Pepper secrets
 
