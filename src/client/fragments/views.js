@@ -8,6 +8,35 @@ escapeHtml(unsafe) {
         .replace(/'/g, '&#039;');
 },
 
+/**
+ * Restrict a stored bookmark URL to http(s) before it reaches an href.
+ *
+ * Write paths already validate the protocol with zod, but rows created by
+ * legacy versions or direct SQL writes can still hold `javascript:` and
+ * similar schemes. The dashboard CSP allows 'unsafe-eval' because Alpine.js
+ * requires it, so an unfiltered href would be directly executable. This keeps
+ * the dashboard consistent with the export path and the extension, which both
+ * already apply the same allowlist.
+ *
+ * The original string is returned verbatim on success so no normalization
+ * side effects are introduced into existing links. This is deliberately a
+ * pure function: it is evaluated by three separate Alpine bindings per row
+ * and must never write to `this`, since mutating the reactive proxy during
+ * effect evaluation risks a re-render loop. One URL parse per call is well
+ * under a millisecond even for a four-digit bookmark count.
+ */
+safeBookmarkUrl(url) {
+    const raw = String(url ?? '');
+    try {
+        const parsed = new URL(raw);
+        return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? raw : '#';
+    } catch {
+        // Relative, empty, or otherwise unparseable values cannot be proven
+        // safe, so they render inert rather than inheriting the page origin.
+        return '#';
+    }
+},
+
 get currentFolders() {
     if (this.currentView === 'trash') {
         return this.trashFolders.filter(f => f.name.toLowerCase().includes(this.searchQuery.toLowerCase()));
@@ -34,8 +63,13 @@ get currentBookmarks() {
 
 get breadcrumbs() {
     const crumbs = [];
+    // Unlike tree building, this walks upward from the selected folder, so a
+    // parent_id cycle in legacy rows (migration 007 only blocks new ones)
+    // would spin forever without the visited guard.
+    const visited = new Set();
     let currentId = this.currentFolderId;
-    while (currentId) {
+    while (currentId && !visited.has(currentId)) {
+        visited.add(currentId);
         const folder = this.folders.find(f => f.id === currentId);
         if (folder) {
             crumbs.unshift(folder);
@@ -57,24 +91,6 @@ getChildFolders(parentId) {
 
 getFolderBookmarkCount(folderId) {
     return this.folderCounts[folderId] || 0;
-},
-
-get flattenedFolders() {
-    const buildHierarchy = (parentId = null, level = 0) => {
-        const children = this.folders.filter(f => f.parent_id === parentId);
-        children.sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
-
-        let result = [];
-        for (const child of children) {
-            result.push({
-                ...child,
-                level: level,
-            });
-            result = result.concat(buildHierarchy(child.id, level + 1));
-        }
-        return result;
-    };
-    return buildHierarchy(null, 0);
 },
 
 get sidebarHtml() {
@@ -161,8 +177,38 @@ getFolderName(id) {
  */
 folderSelectorTemplate(targetField, editingId) {
     const query = (this.selectorQuery || '').trim().toLowerCase();
+
+    // `editingId` is constant for one render, so resolve the folders that
+    // cannot act as a parent once (the folder itself plus its whole subtree)
+    // instead of walking the ancestor chain again for every row. The stack
+    // carries its own visited set, so a legacy hierarchy containing a cycle
+    // terminates instead of looping forever.
+    const forbiddenParents = new Set();
+    if (editingId !== null && editingId !== undefined) {
+        forbiddenParents.add(editingId);
+        const stack = [editingId];
+        while (stack.length > 0) {
+            const currentId = stack.pop();
+            for (const folder of this.folders) {
+                if (folder.parent_id === currentId && !forbiddenParents.has(folder.id)) {
+                    forbiddenParents.add(folder.id);
+                    stack.push(folder.id);
+                }
+            }
+        }
+    }
     const canBeParent = (folder) =>
-        editingId === null || (folder.id !== editingId && !this.isFolderDescendant(folder.id, editingId));
+        editingId === null || editingId === undefined || !forbiddenParents.has(folder.id);
+
+    // Guard against cycles rather than relying on the current data model.
+    //
+    // With a single parent pointer a cycle has no `parent_id = null` entry
+    // point, so a walk from the root cannot reach it today; such rows simply
+    // render as a missing subtree. That is a property of the traversal root,
+    // not of the data, and it would stop holding if orphan subtrees were ever
+    // rendered here to surface those hidden folders. The visited set keeps
+    // that change safe and costs one Set lookup per node.
+    const visited = new Set();
 
     const build = (parentId, depth = 0) => {
         let children = this.folders.filter(f => f.parent_id === parentId);
@@ -170,6 +216,9 @@ folderSelectorTemplate(targetField, editingId) {
 
         let html = '';
         for (const folder of children) {
+            if (visited.has(folder.id)) continue;
+            visited.add(folder.id);
+
             const matches = !query || folder.name.toLowerCase().includes(query);
             const childHtml = build(folder.id, depth + 1);
             if (!matches && !childHtml) continue;
@@ -198,19 +247,6 @@ selectFolderOption(event, targetField) {
     this[targetField] = Number(row.dataset.folderId);
     this.selectorOpen = false;
     this.selectorQuery = '';
-},
-
-isFolderDescendant(folderId, ancestorId) {
-    if (!folderId || !ancestorId || folderId === ancestorId) return false;
-    const visited = new Set();
-    let current = this.folders.find((folder) => folder.id === folderId);
-    while (current?.parent_id !== null && current?.parent_id !== undefined) {
-        if (visited.has(current.id)) return false;
-        visited.add(current.id);
-        if (current.parent_id === ancestorId) return true;
-        current = this.folders.find((folder) => folder.id === current.parent_id);
-    }
-    return false;
 },
 
 toggleSelector(id) {
