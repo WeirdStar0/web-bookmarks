@@ -183,6 +183,22 @@ The following optional variables can be configured in the Cloudflare Dashboard o
 | `RATE_LIMIT_WINDOW` (seconds) | 60 | 1–86400 |
 | `RATE_LIMIT_LOGIN_MAX` | 5 | 1–100 |
 | `RATE_LIMIT_LOGIN_WINDOW` (seconds) | 60 | 1–86400 |
+| `PASSWORD_HASH_ITERATIONS` | 25000 | 25000–100000 |
+
+### Password Hashing Hardening (PASSWORD_PEPPER, recommended)
+
+The v4 password hash format mixes a **pepper** into the derivation — secret material that exists only in Workers Secrets and never in D1. Even a full database leak then leaves an attacker unable to verify the password, let alone crack it offline. Fresh hashes default to 25,000 PBKDF2 iterations — the conservative default under the Workers Free 10 ms CPU budget — configurable to 25,000–100,000 via `PASSWORD_HASH_ITERATIONS` (for example 90000 on Paid plans; out-of-range values fall back to the default), and stored hashes migrate lazily on the next login.
+
+Setup (value format `<id>:<material>`, with a 1–16 character alphanumeric id that must be unique per rotation):
+
+```bash
+openssl rand -base64 32
+npx wrangler secret put PASSWORD_PEPPER   # enter k1:<the output>
+```
+
+The next successful login migrates the stored hash to v4 automatically; password changes and initial admin creation produce v4 directly. Without a pepper the system keeps working (v3, the default 25,000 iterations), so this is recommended rather than required.
+
+**Rotation** (order matters — `wrangler secret put` deploys immediately, and secret values cannot be read back later): keep the current full pepper in a password manager, write the old full value into `PASSWORD_PEPPER_PREVIOUS`, then the new id (e.g. `k2:<fresh random material>`) into `PASSWORD_PEPPER`, and log in once to trigger the re-hash. Before removing `PASSWORD_PEPPER_PREVIOUS`, confirm the stored hash actually references the new id — the migration write fails silently, so run the boolean-only D1 query documented in the runbook first. Never reuse an id and never change the material while keeping an id. **Losing the pepper** makes the corresponding hash unverifiable and login fails closed; the only recovery is the documented reset path (delete the `password` row in `settings`, then re-initialize with `INITIAL_ADMIN_PASSWORD`). See [`docs/password-v4-design.md`](docs/password-v4-design.md).
 
 ### Folder and Data-Loading Bounds
 

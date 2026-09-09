@@ -12,6 +12,14 @@ SECRET_KEY=your-secret-key-replace-me-in-production
 # 请使用至少 12 个字符的强随机密码。生产环境未设置时不会自动创建管理员账户。
 INITIAL_ADMIN_PASSWORD=replace-with-a-strong-initial-password
 
+# 可选但推荐:密码哈希 pepper,仅存于 Worker Secrets / 本地 .dev.vars,绝不落库
+# 值格式 "<id>:<material>":id 每次轮换唯一(1-16 位字母数字),material 建议 openssl rand -base64 32
+# PASSWORD_PEPPER=k1:replace-with-random-material
+# PASSWORD_PEPPER_PREVIOUS=k0:previous-value-only-kept-during-rotation
+
+# 可选:新口令哈希的 PBKDF2 迭代数(25000–100000,默认 25000;Paid 计划可调高)
+# PASSWORD_HASH_ITERATIONS=90000
+
 # 可选:会话过期时间(秒),默认 7 天 (604800)
 # SESSION_MAX_AGE=604800
 

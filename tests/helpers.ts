@@ -985,6 +985,6 @@ export async function login(env: TestEnv) {
     const cookie = response.headers.get('set-cookie');
     expect(cookie).toBeTruthy();
     const db = env.DB as unknown as MockD1Database;
-    expect(db.settings.get('password')?.startsWith('v3:')).toBe(true);
+    expect(/^v[34]:/.test(db.settings.get('password') ?? '')).toBe(true);
     return cookie as string;
 }

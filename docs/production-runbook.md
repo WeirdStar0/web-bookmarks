@@ -81,6 +81,22 @@ npx wrangler secret put INITIAL_ADMIN_PASSWORD
 
 `INITIAL_ADMIN_PASSWORD` must be a unique strong password of at least 12 characters. Never use the local development fallback in production and never put the value in `.dev.vars`, `wrangler.toml`, GitHub logs, screenshots, or issue reports.
 
+### Password pepper rotation
+
+`PASSWORD_PEPPER` (optional but recommended) mixes a D1-external secret into the stored password hash, so a database-only leak cannot verify or crack it. Values are `<id>:<material>` with a unique alphanumeric id per rotation and `openssl rand -base64 32` as the material. Setting it is not upgrade-breaking: the next successful login migrates the stored hash to the peppered v4 format.
+
+Rotate in this order — `wrangler secret put` deploys immediately and secret values cannot be read back afterwards, so keep the current full pepper in a password manager or secret manager first:
+
+1. Write the **old** full value into `PASSWORD_PEPPER_PREVIOUS`. Every stored hash stays verifiable from this moment.
+2. Write the fresh id and material into `PASSWORD_PEPPER`.
+3. Log in once; the login re-hashes the stored hash to the new id.
+4. Confirm the re-hash actually landed before touching `PREVIOUS` — the migration write fails silently by design. Query only the pepper id, never the hash:
+   `npx wrangler d1 execute DB --remote --command "SELECT CASE WHEN value LIKE 'v4:k2:%' THEN 'migrated' ELSE 'not-migrated' END AS state FROM settings WHERE key = 'password';"`
+   Retry the login until it reports `migrated`.
+5. Remove `PASSWORD_PEPPER_PREVIOUS`.
+
+Removing `PASSWORD_PEPPER` while v4 hashes exist locks the account — the recovery path is the password reset procedure (delete the `password` settings row, then re-initialize with `INITIAL_ADMIN_PASSWORD`). See `docs/password-v4-design.md` for the full format and semantics.
+
 ## 5. Release and smoke test
 
 ```bash
