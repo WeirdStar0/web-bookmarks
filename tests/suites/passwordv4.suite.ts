@@ -150,6 +150,29 @@ describe('passwordv4', () => {
         expect(db.settings.get('password')).toBe(storedValue);
     });
 
+    it('derives v4 hashes from an HMAC-SHA-256 prehash of the password', async () => {
+        const material = PEPPER_MATERIAL;
+        const saltHex = '0123456789abcdef0123456789abcdef';
+        const encoder = new TextEncoder();
+
+        // Independent reimplementation of the documented construction:
+        // HMAC-SHA-256(key = pepper, message = password) becomes the PBKDF2
+        // key input. Pins the exact bytes so the format stays interoperable.
+        const hmacKey = await crypto.subtle.importKey(
+            'raw', encoder.encode(material), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+        );
+        const prehash = new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, encoder.encode(TEST_INITIAL_ADMIN_PASSWORD)));
+        const pbkdf2Key = await crypto.subtle.importKey('raw', prehash, { name: 'PBKDF2' }, false, ['deriveBits']);
+        const salt = Uint8Array.from([0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef]);
+        const bits = await crypto.subtle.deriveBits(
+            { name: 'PBKDF2', salt, iterations: 90_000, hash: 'SHA-256' }, pbkdf2Key, 256,
+        );
+        const expected = Array.from(new Uint8Array(bits)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+
+        const { hash } = await hashPasswordV4(TEST_INITIAL_ADMIN_PASSWORD, { id: 'k1', material }, 90_000, saltHex);
+        expect(hash).toBe(expected);
+    });
+
     it('applies the pepper when the password changes through settings', async () => {
         const peppered = pepperEnv(`k1:${PEPPER_MATERIAL}`);
         const cookie = await login(peppered);

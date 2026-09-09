@@ -249,9 +249,23 @@ async function derivePasswordHash(
 ): Promise<{ hash: string; salt: string; iterations: number }> {
     const encoder = new TextEncoder();
     const salt = saltHex ? hexToBuf(saltHex) : crypto.getRandomValues(new Uint8Array(16));
+    // With a pepper, the PBKDF2 input is HMAC-SHA-256(key = pepper, message =
+    // password): unambiguous domain separation with no delimiter collisions,
+    // and a fixed-size key input regardless of password or pepper length.
+    let keyInput: Uint8Array = encoder.encode(password);
+    if (pepperMaterial) {
+        const hmacKey = await crypto.subtle.importKey(
+            'raw',
+            encoder.encode(pepperMaterial),
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['sign'],
+        );
+        keyInput = new Uint8Array(await crypto.subtle.sign('HMAC', hmacKey, encoder.encode(password)));
+    }
     const keyMaterial = await crypto.subtle.importKey(
         'raw',
-        encoder.encode(pepperMaterial ? `${password}:${pepperMaterial}` : password),
+        keyInput,
         { name: 'PBKDF2' },
         false,
         ['deriveBits'],
