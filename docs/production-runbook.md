@@ -17,7 +17,7 @@ node scripts/check_production_config.js
 Before a schema change, create a database backup using the Cloudflare Dashboard or the Wrangler D1 export command supported by the installed Wrangler version. Store the export outside the Git repository and record its timestamp and database name.
 
 ```bash
-npx wrangler d1 export bookmarks-db --remote --output ./bookmarks-backup.sql
+npx wrangler d1 export DB --remote --output ./bookmarks-backup.sql
 ```
 
 If the installed Wrangler version does not support this exact export syntax, stop and use the Dashboard export/backup flow instead of guessing a destructive command.
@@ -30,7 +30,7 @@ For a brand-new database, create the database, put its real ID in `wrangler.toml
 npx wrangler d1 create bookmarks-db
 npm run check:migrations
 npm run db:migrate:remote
-npm run deploy:check
+npm run verify:remote-migrations
 ```
 
 Do not run `schema.sql` and `db:migrate:remote` against the same new database unless you intentionally choose one initialization path and verify the resulting `d1_migrations` ledger.
@@ -40,11 +40,11 @@ Do not run `schema.sql` and `db:migrate:remote` against the same new database un
 Never run `npm run db:init:remote` or upload `schema.sql` to an existing production database. First inspect the migration ledger and schema:
 
 ```bash
-npx wrangler d1 execute bookmarks-db --remote --command \
+npx wrangler d1 execute DB --remote --command \
   "SELECT name FROM d1_migrations ORDER BY name;"
-npx wrangler d1 execute bookmarks-db --remote --command \
+npx wrangler d1 execute DB --remote --command \
   "SELECT type, name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name;"
-npx wrangler d1 execute bookmarks-db --remote --command \
+npx wrangler d1 execute DB --remote --command \
   "SELECT COALESCE(parent_id, 0) AS parent_key, name, COUNT(*) AS active_count, GROUP_CONCAT(id) AS folder_ids FROM folders WHERE is_deleted = 0 GROUP BY COALESCE(parent_id, 0), name HAVING COUNT(*) > 1;"
 ```
 
@@ -56,7 +56,7 @@ After the schema is reconciled, apply only the remaining migrations and verify t
 
 ```bash
 npm run db:migrate:remote
-npm run deploy:check
+npm run verify:remote-migrations
 ```
 
 If a Wrangler migration command reports an SQL parser error for a trigger migration, stop and inspect `d1_migrations` and `sqlite_master` before retrying. A failed migration can leave earlier migrations applied. Do not repeat the entire chain automatically.
@@ -72,9 +72,12 @@ npx wrangler kv namespace create RATE_LIMIT_KV
 Set secrets interactively or through a protected CI environment:
 
 ```bash
+openssl rand -base64 32
 npx wrangler secret put SECRET_KEY
 npx wrangler secret put INITIAL_ADMIN_PASSWORD
 ```
+
+`SECRET_KEY` is mandatory for production: on a non-localhost host every request fails closed until it exists. Installations upgrading from a version that auto-generated a D1-managed `secret_key` must set the Worker secret **before** deploying this version — the new version no longer reads the D1-managed secret.
 
 `INITIAL_ADMIN_PASSWORD` must be a unique strong password of at least 12 characters. Never use the local development fallback in production and never put the value in `.dev.vars`, `wrangler.toml`, GitHub logs, screenshots, or issue reports.
 
@@ -83,8 +86,11 @@ npx wrangler secret put INITIAL_ADMIN_PASSWORD
 ```bash
 npm run check
 npm run deploy:check
-npx wrangler deploy
+npm run deploy
+npm run verify:remote-migrations
 ```
+
+`deploy:check` is intentionally local-only (migration files and production bindings). `npm run deploy` applies pending remote migrations before publishing, so new code can never run against an outdated schema; the remote ledger is then confirmed after deployment with `verify:remote-migrations`, and a first deployment is never blocked by a database that has not been migrated yet.
 
 After deployment, verify the public login page and an unauthenticated API response without submitting credentials:
 

@@ -22,7 +22,7 @@ if (fs.existsSync(d1StateDir)) {
 console.log('⏳ 正在重新初始化本地表结构与索引...');
 try {
     execSync(
-        'npx wrangler d1 execute bookmarks-db --local --file=./schema.sql',
+        'npx wrangler d1 execute DB --local --file=./schema.sql',
         { stdio: 'inherit', cwd: repoRoot }
     );
     console.log('🎉 本地 D1 数据库重置并初始化成功！');

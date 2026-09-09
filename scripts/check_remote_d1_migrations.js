@@ -1,10 +1,17 @@
+// Post-migration verification that the remote D1 ledger contains exactly the
+// migrations in ./migrations. Deliberately NOT part of `deploy:check`: a
+// first deployment must not be blocked by asking a database that may not
+// exist yet to prove it has already been migrated. Apply migrations first
+// (`npm run db:migrate:remote`), then confirm with
+// `npm run verify:remote-migrations`.
+
 const fs = require('fs');
 const path = require('path');
 const { execFileSync, execSync } = require('child_process');
 
 const rootDir = path.resolve(__dirname, '..');
 const migrationsDir = path.join(rootDir, 'migrations');
-const databaseBinding = 'bookmarks-db';
+const databaseBinding = 'DB';
 const requiredMigrations = fs.readdirSync(migrationsDir, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith('.sql'))
     .map((entry) => entry.name)
@@ -33,7 +40,7 @@ try {
         '--json',
     ];
     const output = process.platform === 'win32'
-        ? execSync('npx.cmd wrangler d1 execute bookmarks-db --remote --command "SELECT name FROM d1_migrations ORDER BY name;" --json', {
+        ? execSync(`npx.cmd wrangler d1 execute ${databaseBinding} --remote --command "SELECT name FROM d1_migrations ORDER BY name;" --json`, {
             cwd: rootDir,
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe'],

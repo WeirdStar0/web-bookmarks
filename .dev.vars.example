@@ -3,6 +3,7 @@
 # .dev.vars 文件不应提交到 Git 仓库
 
 # 密钥用于签名 Cookie
+# 本地开发未设置时会自动生成临时密钥;生产(非 localhost)必须显式设置,否则服务失败关闭
 # 请使用强随机字符串,至少 32 个字符
 # 可以使用以下命令生成: openssl rand -base64 32
 SECRET_KEY=your-secret-key-replace-me-in-production

@@ -12,7 +12,7 @@ describe('initfails', () => {
         resetInitState();
     });
 
-    it('fails closed when a session secret cannot be persisted or recovered from D1', async () => {
+    it('fails closed when a local session secret cannot be persisted or recovered from D1', async () => {
         resetInitState();
         const secretlessEnv = {
             ...createEnv(),
@@ -28,7 +28,9 @@ describe('initfails', () => {
             return originalExecuteRun(sql, bindings);
         };
 
-        const response = await app.fetch(new Request('https://example.com/'), secretlessEnv);
+        // Non-local hosts fail closed before touching D1; the persist-or-recover
+        // path only runs for local development.
+        const response = await app.fetch(new Request('http://localhost:8787/'), secretlessEnv);
         expect(response.status).toBe(500);
         expect(db.settings.has('secret_key')).toBe(false);
     });

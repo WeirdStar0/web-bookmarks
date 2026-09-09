@@ -81,4 +81,45 @@ describe('search', () => {
             message: 'Search query must not exceed 200 characters',
         });
     });
+
+    it('returns 401 for an empty query when the session has been revoked', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+        const currentVersion = db.settings.get('session_version');
+        db.settings.set('session_version', `${currentVersion}-revoked`);
+
+        const response = await app.fetch(new Request('https://example.com/api/search?q=', {
+            method: 'GET',
+            headers: { Cookie: cookie, Origin: 'https://example.com' },
+        }), env);
+
+        expect(response.status).toBe(401);
+        expect(await response.json()).toMatchObject({ error: 'UNAUTHORIZED' });
+    });
+
+    it('returns 401 for a revoked session even when the query is overlong', async () => {
+        const cookie = await login(env);
+        const db = env.DB as unknown as MockD1Database;
+        const currentVersion = db.settings.get('session_version');
+        db.settings.set('session_version', `${currentVersion}-revoked`);
+
+        const response = await app.fetch(new Request(`https://example.com/api/search?q=${'a'.repeat(201)}`, {
+            method: 'GET',
+            headers: { Cookie: cookie, Origin: 'https://example.com' },
+        }), env);
+
+        expect(response.status).toBe(401);
+        expect(await response.json()).toMatchObject({ error: 'UNAUTHORIZED' });
+    });
+
+    it('serves an empty result for a valid session with an empty query', async () => {
+        const cookie = await login(env);
+        const response = await app.fetch(new Request('https://example.com/api/search?q=', {
+            method: 'GET',
+            headers: { Cookie: cookie, Origin: 'https://example.com' },
+        }), env);
+
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ bookmarks: [] });
+    });
 });

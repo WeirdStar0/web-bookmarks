@@ -55,7 +55,7 @@
 
 ### 方法一：一键部署 (推荐)
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks-)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks)
 
 点击上方的 **Deploy to Cloudflare Workers** 按钮。它会自动：
 1. Fork/Clone 本仓库到你的账号。
@@ -65,6 +65,7 @@
 **部署后的结果：**
 *   数据库和索引会在首次访问时自动初始化。
 *   首次生产登录前必须设置 `INITIAL_ADMIN_PASSWORD`，否则不会创建默认管理员账号。
+*   生产环境强制要求 `SECRET_KEY`：Deploy to Cloudflare 配置页面会提示填写（部署流程会识别 `.dev.vars.example` 中声明的 Worker secrets）；如果跳过，Worker 部署后会 fail closed，具体错误信息可在 Worker 日志中查看。
 
 ---
 
@@ -72,8 +73,8 @@
 
 1. **克隆并安装**
    ```bash
-   git clone https://github.com/WeirdStar0/web-bookmarks-.git
-   cd web-bookmarks-
+   git clone https://github.com/WeirdStar0/web-bookmarks.git
+   cd web-bookmarks
    npm install
    ```
 
@@ -92,7 +93,10 @@
    npx wrangler secret put SECRET_KEY
    npx wrangler secret put INITIAL_ADMIN_PASSWORD
    npm run deploy:check
-   npx wrangler deploy
+   # 自动应用远程迁移后发布,避免新代码运行在旧 schema 上
+   npm run deploy
+   # 部署后确认远程迁移账本完整
+   npm run verify:remote-migrations
    ```
 
 ## 🛠️ 本地开发 (Local Development)
@@ -101,8 +105,8 @@
 
 ### 1. 克隆与安装
 ```bash
-git clone https://github.com/WeirdStar0/web-bookmarks-.git
-cd web-bookmarks-
+git clone https://github.com/WeirdStar0/web-bookmarks.git
+cd web-bookmarks
 # 使用 Node.js 22（仓库通过 .nvmrc 固定版本）
 nvm use
 npm install
@@ -138,7 +142,7 @@ npm run dev
 
 ### 5. 数据库初始化与升级 (D1 迁移)
 
-迁移序列现以 `001_initial_schema.sql` 为基线。**全新空数据库，以及已经存在正确 `d1_migrations` 账本的旧数据库，应优先使用迁移命令**；它会按顺序创建或升级所需结构。部署门禁会验证远程库已记录全部迁移。
+迁移序列现以 `001_initial_schema.sql` 为基线。**全新空数据库，以及已经存在正确 `d1_migrations` 账本的旧数据库，应优先使用迁移命令**；它会按顺序创建或升级所需结构。部署完成后可运行 `npm run verify:remote-migrations`，确认远程库的迁移账本与本地迁移文件完全一致；该验证独立于部署门禁，因此首次部署不会因为远程库尚未初始化而被阻断。`npm run deploy` 也会在发布前自动应用待执行的远程迁移，避免新代码运行在旧 schema 上。
 
 对于已投入使用的旧数据库，**请不要重新执行 `schema.sql` 或 `db:init` 命令**，以避免跳过迁移治理或产生状态混淆。如果旧库由早期运行时路径初始化，已经有完整业务表但没有 `d1_migrations` 账本，也不要盲目重放整条迁移链；请先按照 [`docs/production-runbook.md`](docs/production-runbook.md) 检查实际模式和数据，再执行迁移。其他情况请使用 D1 迁移命令进行无损升级：
 ```bash
@@ -175,8 +179,8 @@ npm run db:migrate:remote
 为避免登录端点在缺少限流时暴露给暴力破解，生产部署必须绑定 KV 存储：
 1. 创建 KV 命名空间：`npx wrangler kv namespace create RATE_LIMIT_KV`
 2. 将返回的真实 `id` 填入 `wrangler.toml` 中启用的 `[[kv_namespaces]]` 配置块。
-3. 使用 `npx wrangler secret put SECRET_KEY` 和 `npx wrangler secret put INITIAL_ADMIN_PASSWORD` 设置生产密钥。
-4. 运行 `npm run deploy:check` 确认绑定和远程迁移通过，再执行 `npx wrangler deploy`。
+3. 使用 `npx wrangler secret put SECRET_KEY` 和 `npx wrangler secret put INITIAL_ADMIN_PASSWORD` 设置生产密钥；`SECRET_KEY` 为生产强制项，未设置时服务会失败关闭。
+4. 运行 `npm run deploy:check` 确认迁移文件与生产绑定配置通过，执行 `npm run deploy`（先自动应用远程迁移再发布）后用 `npm run verify:remote-migrations` 复核远程迁移账本。不要直接运行 `npx wrangler deploy`，那会跳过迁移应用。
 
 若未完成绑定，或者已绑定的 KV 在运行时读写失败，`/api/login` 都会返回 `503`；这能避免限流不可用时登录端点退化为可暴力破解状态。部署前检查同样会阻止未绑定 KV 的发布。
 
@@ -247,6 +251,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 - 确保生产环境的 `SECRET_KEY` 已通过 `npx wrangler secret put SECRET_KEY` 设置，且与本地一致。
 - 如果更换了密钥，请清除浏览器 Cookie 后重新登录。
 - 如果你重新生成过扩展 `key`，也要同步更新 `ALLOWED_EXTENSION_ORIGINS` 里的 `chrome-extension://...`。
+- **升级注意**：生产（非 localhost）环境现在强制要求 `SECRET_KEY`，且不再回退读取 D1 内自动生成的 `secret_key`。旧安装必须先设置 Worker Secret 再部署新版本（先设 Secret，再部署），否则所有请求都会失败关闭。
 
 ### 3. 如何重置密码？
 当前密码在数据库中以哈希形式存储，不能直接把明文密码写进 `settings.password`。

@@ -53,7 +53,7 @@ A modern bookmark management system built on Cloudflare Workers and D1 database.
 
 ### Option 1: One-Click Deploy (Recommended)
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks-)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks)
 
 Click the **Deploy to Cloudflare Workers** button. It will:
 1. Fork/Clone this repo.
@@ -63,6 +63,7 @@ Click the **Deploy to Cloudflare Workers** button. It will:
 **What happens after deployment:**
 *   Database and indexes are initialized automatically on first visit.
 *   Set `INITIAL_ADMIN_PASSWORD` before the first production login; otherwise no default admin account is created.
+*   `SECRET_KEY` is mandatory in production: the Deploy to Cloudflare setup page prompts for it (the deploy flow reads Worker secrets declared in `.dev.vars.example`); if skipped, requests fail closed after deployment and the setup error is available in Worker logs.
 
 ---
 
@@ -70,8 +71,8 @@ Click the **Deploy to Cloudflare Workers** button. It will:
 
 1. **Clone and Install**
    ```bash
-   git clone https://github.com/WeirdStar0/web-bookmarks-.git
-   cd web-bookmarks-
+   git clone https://github.com/WeirdStar0/web-bookmarks.git
+   cd web-bookmarks
    # Use Node.js 22, pinned by .nvmrc
    nvm use
    npm install
@@ -94,14 +95,16 @@ Click the **Deploy to Cloudflare Workers** button. It will:
    # Create RATE_LIMIT_KV, add its id to wrangler.toml, then verify:
    npm run deploy:check
    npm run deploy
+   # Confirm the remote migration ledger after deploying
+   npm run verify:remote-migrations
    ```
 
 ## 🛠️ Local Development
 
 1. **Clone and Install**
 ```bash
-git clone https://github.com/WeirdStar0/web-bookmarks-.git
-cd web-bookmarks-
+git clone https://github.com/WeirdStar0/web-bookmarks.git
+cd web-bookmarks
 npm install
 ```
 
@@ -132,7 +135,7 @@ Visit `http://localhost:8787`. Local development falls back to `admin` / `local-
 
 5. **D1 Database Initialization and Migration**
 
-The migration history now begins with `001_initial_schema.sql`. **Use the migration commands as the preferred path for fresh empty databases and existing databases that already have a correct `d1_migrations` ledger**; they create or upgrade the required structures in sequence. The deployment gate verifies that the remote database records every migration.
+The migration history now begins with `001_initial_schema.sql`. **Use the migration commands as the preferred path for fresh empty databases and existing databases that already have a correct `d1_migrations` ledger**; they create or upgrade the required structures in sequence. After deploying, `npm run verify:remote-migrations` confirms that the remote database's migration ledger matches the local migration files; this verification is separate from the deployment gate, so a first deployment is never blocked by a remote database that has not been initialized yet. `npm run deploy` also applies pending remote migrations before publishing, so new code never runs against an outdated schema.
 
 For an existing database containing application data, **do NOT re-run `schema.sql` or a `db:init` command**, as this bypasses migration governance and may cause state confusion. If the database was initialized by an older runtime path and has the current tables but no `d1_migrations` ledger, do not blindly replay the full chain: inspect the actual schema and follow [`docs/production-runbook.md`](docs/production-runbook.md) first. Otherwise, upgrade safely using Cloudflare D1's migration features:
 ```bash
@@ -143,7 +146,7 @@ npm run db:migrate:local
 npm run db:migrate:remote
 ```
 
-`npm run db:init:local` and `npm run db:init:remote` remain available only when a fresh database must be populated with the current complete runtime schema in one step; they record migrations `001` through the current version. Never use an initialization command against an existing database with application data. For a production database with data, use the inspection and recovery procedure in [`docs/production-runbook.md`](docs/production-runbook.md) if the deployment check reports that `d1_migrations` does not exist.
+`npm run db:init:local` and `npm run db:init:remote` remain available only when a fresh database must be populated with the current complete runtime schema in one step; they record migrations `001` through the current version. Never use an initialization command against an existing database with application data. For a production database with data, use the inspection and recovery procedure in [`docs/production-runbook.md`](docs/production-runbook.md) if `npm run verify:remote-migrations` reports that `d1_migrations` does not exist.
 
 Frontend assets are generated locally. Do not edit generated files directly:
 - `src/templates/appAsset.ts` from `npm run build:app-asset`
@@ -166,8 +169,8 @@ Use `npm run check` as the pre-commit and pre-deploy quality gate. It runs asset
 ### Configure Rate Limiting (Required for Production)
 1. Create KV: `npx wrangler kv namespace create RATE_LIMIT_KV`.
 2. Add the returned real namespace ID to the active `[[kv_namespaces]]` block in `wrangler.toml`.
-3. Set production secrets with `npx wrangler secret put SECRET_KEY` and `npx wrangler secret put INITIAL_ADMIN_PASSWORD`.
-4. Run `npm run deploy:check`, then deploy with `npx wrangler deploy` or `npm run deploy` in an environment where the full predeploy check completes.
+3. Set production secrets with `npx wrangler secret put SECRET_KEY` and `npx wrangler secret put INITIAL_ADMIN_PASSWORD`; `SECRET_KEY` is mandatory in production and the service fails closed without it.
+4. Run `npm run deploy:check` (local migration-file and production-binding checks), deploy with `npm run deploy` (applies pending remote migrations before publishing), then confirm the remote migration ledger with `npm run verify:remote-migrations`. Do not deploy with bare `npx wrangler deploy`; it skips migration application.
 
 Without this binding, or when the bound KV fails at runtime, `/api/login` fails closed with `503`; this prevents the login endpoint from degrading into an unprotected brute-force target. The pre-deploy check also blocks publication when the KV binding is absent.
 
@@ -231,6 +234,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 - Ensure `SECRET_KEY` is set via `npx wrangler secret put`.
 - If key changed, clear cookies and relogin.
 - If you regenerated the extension `key`, update `ALLOWED_EXTENSION_ORIGINS` with the new `chrome-extension://...` value too.
+- **Upgrade note**: production (non-localhost) deployments now require `SECRET_KEY` and no longer fall back to the D1-managed `secret_key`. Existing installations must set the Worker secret **before** deploying this version — set the secret first, then deploy; otherwise every request fails closed.
 
 ### 3. Reset Password
 Passwords are stored as hashes, so writing plaintext into `settings.password` is no longer valid.
