@@ -47,9 +47,12 @@ export async function hashPassword(password: string): Promise<string> {
     return hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-// V2: PBKDF2-SHA256 with a fixed legacy work factor.
+// V2: PBKDF2-SHA256 with a fixed legacy work factor. The factor is part of
+// the format (never stored in the value), so upgrades must preserve it.
+export const PASSWORD_HASH_V2_ITERATIONS = 100_000;
+
 export async function hashPasswordV2(password: string, saltHex?: string): Promise<{ hash: string; salt: string }> {
-    const result = await derivePasswordHash(password, 100000, saltHex);
+    const result = await derivePasswordHash(password, PASSWORD_HASH_V2_ITERATIONS, saltHex);
     return { hash: result.hash, salt: result.salt };
 }
 
@@ -104,10 +107,11 @@ export function parsePepperValue(rawValue: string | undefined, label: string): P
     const id = separator === -1 ? '' : rawValue.slice(0, separator);
     const material = separator === -1 ? '' : rawValue.slice(separator + 1);
     if (!/^[A-Za-z0-9]{1,16}$/.test(id) || material.length < MIN_PEPPER_MATERIAL_LENGTH) {
-        // A typo must not lock the administrator out of a v3 deployment: an
-        // invalid pepper is treated as absent for writes and cannot verify v4
-        // hashes, and the operator gets one warning per isolate.
-        console.warn(`${label} is malformed; expected "<id>:<material>" with an alphanumeric id (1-16 chars) and at least ${MIN_PEPPER_MATERIAL_LENGTH} material characters. Treating it as unset.`);
+        // Path-dependent semantics: verification treats a malformed pepper as
+        // unavailable (v4 fails closed, v3 keeps verifying), while password
+        // writes fail closed - silently downgrading them to unpeppered v3
+        // would weaken security without the operator noticing.
+        console.warn(`${label} is malformed; expected "<id>:<material>" with an alphanumeric id (1-16 chars) and at least ${MIN_PEPPER_MATERIAL_LENGTH} material characters.`);
         return null;
     }
     return { id, material };
@@ -216,7 +220,13 @@ export async function verifyStoredPassword(env: Bindings, storedValue: string, p
         const parts = storedValue.split(':');
         if (parts.length !== 3) return { ok: false, needsUpgrade: false, upgradeFactor: 0 };
         const verify = await hashPasswordV2(password, parts[1]);
-        return { ok: verify.hash === parts[2], needsUpgrade: true, upgradeFactor: resolvePasswordIterations(env) };
+        // v2's implicit work factor is 100k; migrating it must never target
+        // less, or the legacy upgrade would itself be a downgrade.
+        return {
+            ok: verify.hash === parts[2],
+            needsUpgrade: true,
+            upgradeFactor: Math.max(PASSWORD_HASH_V2_ITERATIONS, resolvePasswordIterations(env)),
+        };
     }
     // v1: bare SHA-256 hex digest of the password.
     const inputHash = await hashPassword(password);

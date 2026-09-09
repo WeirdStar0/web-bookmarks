@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import app from '../../src/index';
 import { resetInitState } from '../../src/middleware/init';
 import { createEnv, MockD1Database, type TestEnv } from '../helpers';
-import { hashPassword, hashPasswordV3, hashPasswordV4, parsePasswordHashV3, parsePasswordHashV4, serializePasswordHashV3 } from '../../src/utils/common';
+import { hashPassword, hashPasswordV2, hashPasswordV3, hashPasswordV4, parsePasswordHashV3, parsePasswordHashV4, serializePasswordHashV3 } from '../../src/utils/common';
 import { TEST_INITIAL_ADMIN_PASSWORD } from '../constants';
 
 const PEPPER_MATERIAL = 'unit-test-pepper-material-with-enough-length';
@@ -106,6 +106,31 @@ describe('passwordmigration', () => {
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({ success: true });
         expect(db.settings.get('password')).toBe(storedValue);
+    });
+
+    it('migrates a legacy v2 hash to v3 without lowering the 100k factor', async () => {
+        const db = env.DB as unknown as MockD1Database;
+        const legacy = await hashPasswordV2('legacy-password-2026', LEGACY_SALT);
+        db.settings.set('username', 'admin');
+        db.settings.set('password', `v2:${legacy.salt}:${legacy.hash}`);
+
+        const response = await postLogin(env, 'legacy-password-2026');
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ success: true, migrated: true });
+        expect(parsePasswordHashV3(db.settings.get('password') ?? '')).toMatchObject({ iterations: 100_000 });
+    });
+
+    it('migrates a legacy v2 hash to v4 at 100k when a pepper is configured', async () => {
+        const peppered = { ...createEnv(), PASSWORD_PEPPER: `k1:${PEPPER_MATERIAL}` };
+        const db = peppered.DB as unknown as MockD1Database;
+        const legacy = await hashPasswordV2('legacy-password-2026', LEGACY_SALT);
+        db.settings.set('username', 'admin');
+        db.settings.set('password', `v2:${legacy.salt}:${legacy.hash}`);
+
+        const response = await postLogin(peppered, 'legacy-password-2026');
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ success: true, migrated: true });
+        expect(parsePasswordHashV4(db.settings.get('password') ?? '')).toMatchObject({ pepperId: 'k1', iterations: 100_000 });
     });
 
     it('does not fail the login when the migration write throws', async () => {

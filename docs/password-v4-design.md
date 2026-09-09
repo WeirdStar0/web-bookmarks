@@ -75,10 +75,12 @@ A pepper secret value is `<id>:<material>` (split on the **first** colon):
 
 Example: `PASSWORD_PEPPER=k1:hfG3...base64...=`.
 
-A malformed value (no colon, bad id, short material) is treated as absent, with
-a `console.warn` at use time. We deliberately do not 500 on a bad pepper: the
-operator keeps a working (v3) login path and sees the warning, instead of
-losing the admin session to a typo.
+A malformed value behaves differently per path, and the distinction is
+deliberate: the **verification path** treats it as unavailable (a stored v4
+whose id resolves nowhere fails closed; a v3 hash keeps verifying), while the
+**password write path** fails closed with a 500 — silently falling back to an
+unpeppered v3 on every future write would downgrade security without the
+operator noticing. Either way a `console.warn` names the malformed secret.
 
 ### Verification and rotation
 
@@ -153,9 +155,10 @@ so a concurrent credential change (or a concurrent migration) is detected by
 Second hard invariant: **a lazy upgrade never lowers the existing work
 factor.** The target factor is `max(stored factor, configured factor)`, so
 removing or lowering `PASSWORD_HASH_ITERATIONS` leaves higher-factor hashes
-untouched instead of re-writing them weaker. v1/v2 carry no preserved factor
-and target the configured factor, matching the pre-v4 migration path.
-Outcomes are handled per format:
+untouched instead of re-writing them weaker. v3 and v4 carry their factor
+explicitly; v2's implicit 100,000 is preserved the same way. Only v1 — a bare
+digest with no factor — targets the configured factor, matching the pre-v4
+migration path. Outcomes are handled per format:
 
 - `changes = 0` on a **v1/v2** login aborts the login with 401. For legacy
   formats the conditional write doubles as the concurrent-credential check;
@@ -193,7 +196,8 @@ default-password replacement (init middleware), and `PUT /api/settings`.
   verification keep the v4 hash byte-for-byte; malformed current fails
   password writes closed
 - factor preservation: 90k v4 and v3 hashes survive a drop back to the default
-  configured factor, and a 90k v3 → v4 migration keeps 90k
+  configured factor, a 90k v3 → v4 migration keeps 90k, and a v2 migration
+  keeps its implicit 100k (v3 or v4)
 - HMAC prehash construction pinned by an interop test using raw Web Crypto
 - v3 → v4 login migration (`migrated: true`), v3 → v3 at a configured higher
   factor, and no-op when the stored hash is already current
