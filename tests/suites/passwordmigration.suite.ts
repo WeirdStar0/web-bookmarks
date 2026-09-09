@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import app from '../../src/index';
 import { resetInitState } from '../../src/middleware/init';
 import { createEnv, MockD1Database, type TestEnv } from '../helpers';
-import { hashPassword, hashPasswordV3, parsePasswordHashV3, parsePasswordHashV4, serializePasswordHashV3 } from '../../src/utils/common';
+import { hashPassword, hashPasswordV3, hashPasswordV4, parsePasswordHashV3, parsePasswordHashV4, serializePasswordHashV3 } from '../../src/utils/common';
 import { TEST_INITIAL_ADMIN_PASSWORD } from '../constants';
 
 const PEPPER_MATERIAL = 'unit-test-pepper-material-with-enough-length';
@@ -68,6 +68,44 @@ describe('passwordmigration', () => {
         expect(response.status).toBe(200);
         expect(await response.json()).toEqual({ success: true });
         expect(db.settings.get('password')).toBe(current);
+    });
+
+    it('keeps a 90k v4 hash when the configured factor drops back to the default', async () => {
+        const peppered = { ...createEnv(), PASSWORD_PEPPER: `k1:${PEPPER_MATERIAL}` };
+        const db = peppered.DB as unknown as MockD1Database;
+        db.settings.set('username', 'admin');
+        const high = await hashPasswordV4(TEST_INITIAL_ADMIN_PASSWORD, { id: 'k1', material: PEPPER_MATERIAL }, 90_000);
+        const storedValue = `v4:k1:${high.iterations}:${high.salt}:${high.hash}`;
+        db.settings.set('password', storedValue);
+
+        const response = await postLogin(peppered, TEST_INITIAL_ADMIN_PASSWORD);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ success: true });
+        expect(parsePasswordHashV4(db.settings.get('password') ?? '')).toMatchObject({ pepperId: 'k1', iterations: 90_000 });
+    });
+
+    it('migrates a 90k v3 hash to v4 without lowering the work factor', async () => {
+        const peppered = { ...createEnv(), PASSWORD_PEPPER: `k1:${PEPPER_MATERIAL}` };
+        const db = peppered.DB as unknown as MockD1Database;
+        db.settings.set('username', 'admin');
+        db.settings.set('password', serializePasswordHashV3(await hashPasswordV3(TEST_INITIAL_ADMIN_PASSWORD, 90_000, LEGACY_SALT)));
+
+        const response = await postLogin(peppered, TEST_INITIAL_ADMIN_PASSWORD);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({ success: true, migrated: true });
+        expect(parsePasswordHashV4(db.settings.get('password') ?? '')).toMatchObject({ pepperId: 'k1', iterations: 90_000 });
+    });
+
+    it('keeps a 90k v3 hash when no pepper is configured and the factor drops', async () => {
+        const db = env.DB as unknown as MockD1Database;
+        const storedValue = serializePasswordHashV3(await hashPasswordV3(TEST_INITIAL_ADMIN_PASSWORD, 90_000, LEGACY_SALT));
+        db.settings.set('username', 'admin');
+        db.settings.set('password', storedValue);
+
+        const response = await postLogin(env, TEST_INITIAL_ADMIN_PASSWORD);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ success: true });
+        expect(db.settings.get('password')).toBe(storedValue);
     });
 
     it('does not fail the login when the migration write throws', async () => {

@@ -5,6 +5,7 @@ import {
     getConfig,
     getSessionVersion,
     getSettings,
+    resolvePasswordIterations,
     rotateSessionVersion,
     upgradeStoredPasswordIfUnchanged,
     verifyStoredPassword,
@@ -46,7 +47,7 @@ async function setAuthCookie(
 }
 
 async function createInitialPassword(env: Bindings, db: D1Database, password: string): Promise<boolean> {
-    const value = await createPasswordHash(env, password);
+    const value = await createPasswordHash(env, password, resolvePasswordIterations(env));
     const inserted = await db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)')
         .bind('password', value)
         .run();
@@ -102,7 +103,7 @@ export function registerAuthRoutes(app: ApiApp) {
                 const isLegacyFormat = !dbPass.startsWith('v3:') && !dbPass.startsWith('v4:');
                 let migrated = false;
                 if (verdict.needsUpgrade) {
-                    const outcome = await upgradeStoredPasswordIfUnchanged(c.env, c.env.DB, dbPass, password);
+                    const outcome = await upgradeStoredPasswordIfUnchanged(c.env, c.env.DB, dbPass, password, verdict.upgradeFactor);
                     if (outcome === 'applied') migrated = true;
                     if (outcome === 'unchanged' && isLegacyFormat) {
                         return c.json(err(ErrCode.INVALID_CREDENTIALS, 'Invalid credentials'), 401);
@@ -140,7 +141,7 @@ export function registerAuthRoutes(app: ApiApp) {
             // storage failure cannot leave a changed username/password paired
             // with an unrevoked old session.
             const passwordHash = password
-                ? await createPasswordHash(c.env, password)
+                ? await createPasswordHash(c.env, password, resolvePasswordIterations(c.env))
                 : null;
             const nextSessionVersion = crypto.randomUUID();
             const statements = [];

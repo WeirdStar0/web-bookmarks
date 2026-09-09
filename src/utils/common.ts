@@ -151,69 +151,74 @@ export async function hashPasswordV4(
     return { ...result, pepperId: pepper.id };
 }
 
-// Fresh hashes use the best available format for the configuration: v4 with
-// the current pepper, or v3 at the current work factor when no pepper is set.
-// A configured-but-malformed pepper fails closed: silently falling back to an
-// unpeppered v3 would downgrade every future password write without the
+// Fresh hashes use the best available format for the configuration at the
+// requested work factor: v4 with the current pepper, or v3 when no pepper is
+// set. A configured-but-malformed pepper fails closed: silently falling back
+// to an unpeppered v3 would downgrade every future password write without the
 // operator noticing. Fix the secret (or remove it for v3) and retry.
-export async function createPasswordHash(env: Bindings, password: string): Promise<string> {
+export async function createPasswordHash(env: Bindings, password: string, iterations: number): Promise<string> {
     if (!env.PASSWORD_PEPPER) {
-        return serializePasswordHashV3(await hashPasswordV3(password, resolvePasswordIterations(env)));
+        return serializePasswordHashV3(await hashPasswordV3(password, iterations));
     }
     const pepper = resolveCurrentPepper(env);
     if (!pepper) {
         throw new Error('PASSWORD_PEPPER is configured but malformed: fix it (or remove it to use unpeppered v3 hashes) before changing passwords.');
     }
-    return formatPasswordHashV4(await hashPasswordV4(password, pepper, resolvePasswordIterations(env)));
+    return formatPasswordHashV4(await hashPasswordV4(password, pepper, iterations));
 }
 
-export type StoredPasswordVerifyResult = { ok: boolean; needsUpgrade: boolean };
+export type StoredPasswordVerifyResult = { ok: boolean; needsUpgrade: boolean; upgradeFactor: number };
 
 // Verify a password against any stored hash format. needsUpgrade marks a
 // successful verification whose stored value is not the best format the
-// current configuration can produce; callers may then migrate on login.
+// current configuration can produce; callers may then migrate on login using
+// upgradeFactor. Hard invariant: a lazy upgrade never lowers the existing work
+// factor — the target is max(stored factor, configured factor) — so losing or
+// lowering the configuration can never weaken an existing hash. (v1/v2 carry
+// no preserved factor; their upgrade target is the configured factor, exactly
+// like the pre-v4 migration path.)
 export async function verifyStoredPassword(env: Bindings, storedValue: string, password: string): Promise<StoredPasswordVerifyResult> {
     if (storedValue.startsWith('v4:')) {
         const parsed = parsePasswordHashV4(storedValue);
-        if (!parsed) return { ok: false, needsUpgrade: false };
+        if (!parsed) return { ok: false, needsUpgrade: false, upgradeFactor: 0 };
         const pepper = resolvePepperById(env, parsed.pepperId);
         // An id that resolves to no configured pepper makes verification fail
         // closed: without its pepper the supplied password cannot be checked.
-        if (!pepper) return { ok: false, needsUpgrade: false };
+        if (!pepper) return { ok: false, needsUpgrade: false, upgradeFactor: 0 };
         const verify = await hashPasswordV4(password, pepper, parsed.iterations, parsed.salt);
         const ok = verify.hash === parsed.hash;
-        // Hard invariant: never downgrade a peppered hash. Re-hashing to a new
-        // v4 is only possible while a valid current pepper exists — with the
-        // pepper absent or malformed, the stored hash stays exactly as it is.
+        // Never downgrade a peppered hash, and never drop the pepper: re-hashing
+        // to a new v4 is only possible while a valid current pepper exists, at
+        // a factor at least as high as the stored one.
         const current = resolveCurrentPepper(env);
+        const upgradeFactor = Math.max(parsed.iterations, resolvePasswordIterations(env));
         const needsUpgrade = ok && Boolean(current)
-            && (pepper.id !== current!.id || parsed.iterations !== resolvePasswordIterations(env));
-        return { ok, needsUpgrade };
+            && (pepper.id !== current!.id || upgradeFactor !== parsed.iterations);
+        return { ok, needsUpgrade, upgradeFactor };
     }
     if (storedValue.startsWith('v3:')) {
         const parsed = parsePasswordHashV3(storedValue);
-        if (!parsed) return { ok: false, needsUpgrade: false };
+        if (!parsed) return { ok: false, needsUpgrade: false, upgradeFactor: 0 };
         const verify = await hashPasswordV3(password, parsed.iterations, parsed.salt);
         const ok = verify.hash === parsed.hash;
         // Upgrade a verified v3 when a valid current pepper exists (→ v4), or
-        // when clean no-pepper mode is configured and the work factor moved.
-        // A configured-but-malformed pepper offers no upgrade target: the hash
-        // stays v3 until the operator fixes the secret.
+        // when clean no-pepper mode is configured and the work factor would
+        // rise. A configured-but-malformed pepper offers no upgrade target:
+        // the hash stays v3 until the operator fixes the secret.
         const current = resolveCurrentPepper(env);
-        const upgradeTargetReady = Boolean(current) || !env.PASSWORD_PEPPER;
-        const needsUpgrade = ok && upgradeTargetReady
-            && (Boolean(current) || parsed.iterations !== resolvePasswordIterations(env));
-        return { ok, needsUpgrade };
+        const upgradeFactor = Math.max(parsed.iterations, resolvePasswordIterations(env));
+        const needsUpgrade = ok && (Boolean(current) || (!env.PASSWORD_PEPPER && upgradeFactor !== parsed.iterations));
+        return { ok, needsUpgrade, upgradeFactor };
     }
     if (storedValue.startsWith('v2:')) {
         const parts = storedValue.split(':');
-        if (parts.length !== 3) return { ok: false, needsUpgrade: false };
+        if (parts.length !== 3) return { ok: false, needsUpgrade: false, upgradeFactor: 0 };
         const verify = await hashPasswordV2(password, parts[1]);
-        return { ok: verify.hash === parts[2], needsUpgrade: true };
+        return { ok: verify.hash === parts[2], needsUpgrade: true, upgradeFactor: resolvePasswordIterations(env) };
     }
     // v1: bare SHA-256 hex digest of the password.
     const inputHash = await hashPassword(password);
-    return { ok: inputHash === storedValue, needsUpgrade: true };
+    return { ok: inputHash === storedValue, needsUpgrade: true, upgradeFactor: resolvePasswordIterations(env) };
 }
 
 export type StoredPasswordUpgrade = 'applied' | 'unchanged' | 'failed';
@@ -228,9 +233,10 @@ export async function upgradeStoredPasswordIfUnchanged(
     db: D1Database,
     expectedStoredValue: string,
     password: string,
+    iterations: number,
 ): Promise<StoredPasswordUpgrade> {
     try {
-        const value = await createPasswordHash(env, password);
+        const value = await createPasswordHash(env, password, iterations);
         const updated = await db.prepare('UPDATE settings SET value = ? WHERE key = ? AND value = ?')
             .bind(value, 'password', expectedStoredValue)
             .run();

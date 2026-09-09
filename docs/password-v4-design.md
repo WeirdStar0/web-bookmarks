@@ -139,7 +139,14 @@ configuration:
 The upgrade is a single conditional write,
 `UPDATE settings SET value = ? WHERE key = 'password' AND value = <expected>`,
 so a concurrent credential change (or a concurrent migration) is detected by
-`changes = 0` and never overwritten. Outcomes are handled per format:
+`changes = 0` and never overwritten.
+
+Second hard invariant: **a lazy upgrade never lowers the existing work
+factor.** The target factor is `max(stored factor, configured factor)`, so
+removing or lowering `PASSWORD_HASH_ITERATIONS` leaves higher-factor hashes
+untouched instead of re-writing them weaker. v1/v2 carry no preserved factor
+and target the configured factor, matching the pre-v4 migration path.
+Outcomes are handled per format:
 
 - `changes = 0` on a **v1/v2** login aborts the login with 401. For legacy
   formats the conditional write doubles as the concurrent-credential check;
@@ -176,6 +183,8 @@ default-password replacement (init middleware), and `PUT /api/settings`.
 - downgrade protection: `PREVIOUS`-only verification and malformed-current
   verification keep the v4 hash byte-for-byte; malformed current fails
   password writes closed
+- factor preservation: 90k v4 and v3 hashes survive a drop back to the default
+  configured factor, and a 90k v3 → v4 migration keeps 90k
 - HMAC prehash construction pinned by an interop test using raw Web Crypto
 - v3 → v4 login migration (`migrated: true`), v3 → v3 at a configured higher
   factor, and no-op when the stored hash is already current

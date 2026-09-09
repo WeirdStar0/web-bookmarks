@@ -1,13 +1,13 @@
 import type { Context, Next } from 'hono';
 import { Bindings, Variables } from '../types';
 import { INIT_SQL } from '../db/schema';
-import { createPasswordHash, getSettings, hashPassword } from '../utils/common';
+import { createPasswordHash, getSettings, hashPassword, resolvePasswordIterations } from '../utils/common';
 
 const MIN_INITIAL_PASSWORD_LENGTH = 12;
 const LOCAL_DEVELOPMENT_PASSWORD = 'local-development-only';
 
 async function createInitialAdminPasswordHash(env: Bindings, password: string): Promise<string> {
-    return createPasswordHash(env, password);
+    return createPasswordHash(env, password, resolvePasswordIterations(env));
 }
 
 let instanceSecret: string | null = null;
