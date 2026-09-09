@@ -1,0 +1,8 @@
+# Temporary zero-binding benchmark Worker; see worker.ts. Deploy it with:
+#   cd scripts/kdf_bench && npx wrangler deploy
+# and delete it after collecting data:
+#   npx wrangler delete
+name = "web-bookmarks-kdf-bench"
+main = "worker.ts"
+compatibility_date = "2025-11-21"
+workers_dev = true
