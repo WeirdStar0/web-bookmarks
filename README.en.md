@@ -53,7 +53,7 @@ A modern bookmark management system built on Cloudflare Workers and D1 database.
 
 ### Option 1: One-Click Deploy (Recommended)
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks-)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks)
 
 Click the **Deploy to Cloudflare Workers** button. It will:
 1. Fork/Clone this repo.
@@ -70,8 +70,8 @@ Click the **Deploy to Cloudflare Workers** button. It will:
 
 1. **Clone and Install**
    ```bash
-   git clone https://github.com/WeirdStar0/web-bookmarks-.git
-   cd web-bookmarks-
+   git clone https://github.com/WeirdStar0/web-bookmarks.git
+   cd web-bookmarks
    # Use Node.js 22, pinned by .nvmrc
    nvm use
    npm install
@@ -100,8 +100,8 @@ Click the **Deploy to Cloudflare Workers** button. It will:
 
 1. **Clone and Install**
 ```bash
-git clone https://github.com/WeirdStar0/web-bookmarks-.git
-cd web-bookmarks-
+git clone https://github.com/WeirdStar0/web-bookmarks.git
+cd web-bookmarks
 npm install
 ```
 

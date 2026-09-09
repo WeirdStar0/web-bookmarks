@@ -55,7 +55,7 @@
 
 ### 方法一：一键部署 (推荐)
 
-[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks-)
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks)
 
 点击上方的 **Deploy to Cloudflare Workers** 按钮。它会自动：
 1. Fork/Clone 本仓库到你的账号。
@@ -72,8 +72,8 @@
 
 1. **克隆并安装**
    ```bash
-   git clone https://github.com/WeirdStar0/web-bookmarks-.git
-   cd web-bookmarks-
+   git clone https://github.com/WeirdStar0/web-bookmarks.git
+   cd web-bookmarks
    npm install
    ```
 
@@ -101,8 +101,8 @@
 
 ### 1. 克隆与安装
 ```bash
-git clone https://github.com/WeirdStar0/web-bookmarks-.git
-cd web-bookmarks-
+git clone https://github.com/WeirdStar0/web-bookmarks.git
+cd web-bookmarks
 # 使用 Node.js 22（仓库通过 .nvmrc 固定版本）
 nvm use
 npm install
