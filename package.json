@@ -23,7 +23,7 @@
     "deploy:check": "npm run check:migrations && node scripts/check_production_config.js",
     "verify:remote-migrations": "node scripts/check_remote_d1_migrations.js",
     "test:deploy-config": "node scripts/test_production_config.js",
-    "deploy": "wrangler deploy",
+    "deploy": "npm run db:migrate:remote && wrangler deploy",
     "predeploy": "npm run check && npm run deploy:check",
     "lint": "eslint \"src/**/*.ts\" \"extension/*.js\"",
     "check:migrations": "node scripts/check_migration_files.js",

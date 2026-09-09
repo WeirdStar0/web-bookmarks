@@ -86,11 +86,11 @@ npx wrangler secret put INITIAL_ADMIN_PASSWORD
 ```bash
 npm run check
 npm run deploy:check
-npx wrangler deploy
+npm run deploy
 npm run verify:remote-migrations
 ```
 
-`deploy:check` is intentionally local-only (migration files and production bindings). The remote ledger is verified after migration and after deployment with `verify:remote-migrations`, so a first deployment is never blocked by a database that has not been migrated yet.
+`deploy:check` is intentionally local-only (migration files and production bindings). `npm run deploy` applies pending remote migrations before publishing, so new code can never run against an outdated schema; the remote ledger is then confirmed after deployment with `verify:remote-migrations`, and a first deployment is never blocked by a database that has not been migrated yet.
 
 After deployment, verify the public login page and an unauthenticated API response without submitting credentials:
 

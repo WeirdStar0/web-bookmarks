@@ -135,7 +135,7 @@ Visit `http://localhost:8787`. Local development falls back to `admin` / `local-
 
 5. **D1 Database Initialization and Migration**
 
-The migration history now begins with `001_initial_schema.sql`. **Use the migration commands as the preferred path for fresh empty databases and existing databases that already have a correct `d1_migrations` ledger**; they create or upgrade the required structures in sequence. After deploying, `npm run verify:remote-migrations` confirms that the remote database's migration ledger matches the local migration files; this verification is separate from the deployment gate, so a first deployment is never blocked by a remote database that has not been initialized yet.
+The migration history now begins with `001_initial_schema.sql`. **Use the migration commands as the preferred path for fresh empty databases and existing databases that already have a correct `d1_migrations` ledger**; they create or upgrade the required structures in sequence. After deploying, `npm run verify:remote-migrations` confirms that the remote database's migration ledger matches the local migration files; this verification is separate from the deployment gate, so a first deployment is never blocked by a remote database that has not been initialized yet. `npm run deploy` also applies pending remote migrations before publishing, so new code never runs against an outdated schema.
 
 For an existing database containing application data, **do NOT re-run `schema.sql` or a `db:init` command**, as this bypasses migration governance and may cause state confusion. If the database was initialized by an older runtime path and has the current tables but no `d1_migrations` ledger, do not blindly replay the full chain: inspect the actual schema and follow [`docs/production-runbook.md`](docs/production-runbook.md) first. Otherwise, upgrade safely using Cloudflare D1's migration features:
 ```bash
@@ -170,7 +170,7 @@ Use `npm run check` as the pre-commit and pre-deploy quality gate. It runs asset
 1. Create KV: `npx wrangler kv namespace create RATE_LIMIT_KV`.
 2. Add the returned real namespace ID to the active `[[kv_namespaces]]` block in `wrangler.toml`.
 3. Set production secrets with `npx wrangler secret put SECRET_KEY` and `npx wrangler secret put INITIAL_ADMIN_PASSWORD`; `SECRET_KEY` is mandatory in production and the service fails closed without it.
-4. Run `npm run deploy:check` (local migration-file and production-binding checks), deploy with `npx wrangler deploy` or `npm run deploy`, then confirm the remote migration ledger with `npm run verify:remote-migrations`.
+4. Run `npm run deploy:check` (local migration-file and production-binding checks), deploy with `npm run deploy` (applies pending remote migrations before publishing), then confirm the remote migration ledger with `npm run verify:remote-migrations`. Do not deploy with bare `npx wrangler deploy`; it skips migration application.
 
 Without this binding, or when the bound KV fails at runtime, `/api/login` fails closed with `503`; this prevents the login endpoint from degrading into an unprotected brute-force target. The pre-deploy check also blocks publication when the KV binding is absent.
 

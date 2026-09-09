@@ -93,7 +93,8 @@
    npx wrangler secret put SECRET_KEY
    npx wrangler secret put INITIAL_ADMIN_PASSWORD
    npm run deploy:check
-   npx wrangler deploy
+   # 自动应用远程迁移后发布,避免新代码运行在旧 schema 上
+   npm run deploy
    # 部署后确认远程迁移账本完整
    npm run verify:remote-migrations
    ```
@@ -141,7 +142,7 @@ npm run dev
 
 ### 5. 数据库初始化与升级 (D1 迁移)
 
-迁移序列现以 `001_initial_schema.sql` 为基线。**全新空数据库，以及已经存在正确 `d1_migrations` 账本的旧数据库，应优先使用迁移命令**；它会按顺序创建或升级所需结构。部署完成后可运行 `npm run verify:remote-migrations`，确认远程库的迁移账本与本地迁移文件完全一致；该验证独立于部署门禁，因此首次部署不会因为远程库尚未初始化而被阻断。
+迁移序列现以 `001_initial_schema.sql` 为基线。**全新空数据库，以及已经存在正确 `d1_migrations` 账本的旧数据库，应优先使用迁移命令**；它会按顺序创建或升级所需结构。部署完成后可运行 `npm run verify:remote-migrations`，确认远程库的迁移账本与本地迁移文件完全一致；该验证独立于部署门禁，因此首次部署不会因为远程库尚未初始化而被阻断。`npm run deploy` 也会在发布前自动应用待执行的远程迁移，避免新代码运行在旧 schema 上。
 
 对于已投入使用的旧数据库，**请不要重新执行 `schema.sql` 或 `db:init` 命令**，以避免跳过迁移治理或产生状态混淆。如果旧库由早期运行时路径初始化，已经有完整业务表但没有 `d1_migrations` 账本，也不要盲目重放整条迁移链；请先按照 [`docs/production-runbook.md`](docs/production-runbook.md) 检查实际模式和数据，再执行迁移。其他情况请使用 D1 迁移命令进行无损升级：
 ```bash
@@ -179,7 +180,7 @@ npm run db:migrate:remote
 1. 创建 KV 命名空间：`npx wrangler kv namespace create RATE_LIMIT_KV`
 2. 将返回的真实 `id` 填入 `wrangler.toml` 中启用的 `[[kv_namespaces]]` 配置块。
 3. 使用 `npx wrangler secret put SECRET_KEY` 和 `npx wrangler secret put INITIAL_ADMIN_PASSWORD` 设置生产密钥；`SECRET_KEY` 为生产强制项，未设置时服务会失败关闭。
-4. 运行 `npm run deploy:check` 确认迁移文件与生产绑定配置通过，执行 `npx wrangler deploy` 后用 `npm run verify:remote-migrations` 复核远程迁移账本。
+4. 运行 `npm run deploy:check` 确认迁移文件与生产绑定配置通过，执行 `npm run deploy`（先自动应用远程迁移再发布）后用 `npm run verify:remote-migrations` 复核远程迁移账本。不要直接运行 `npx wrangler deploy`，那会跳过迁移应用。
 
 若未完成绑定，或者已绑定的 KV 在运行时读写失败，`/api/login` 都会返回 `503`；这能避免限流不可用时登录端点退化为可暴力破解状态。部署前检查同样会阻止未绑定 KV 的发布。
 
