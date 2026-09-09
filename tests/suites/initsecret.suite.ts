@@ -40,12 +40,10 @@ describe('initsecret', () => {
         db.settings.set('secret_key', 'legacy-d1-managed-secret');
 
         const response = await app.fetch(new Request('https://example.com/'), secretless);
-        expect(response.status).toBe(500);
+        expect(response.status).toBe(503);
 
         const body = await response.json() as any;
-        expect(body).toMatchObject({
-            error: 'Internal Server Error',
-        });
+        expect(body).toMatchObject({ error: 'DEPLOYMENT_NOT_INITIALIZED' });
     });
 
     it('still auto-generates a D1-backed secret for local development', async () => {

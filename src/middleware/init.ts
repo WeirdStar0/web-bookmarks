@@ -1,7 +1,7 @@
 import type { Context, Next } from 'hono';
 import { Bindings, Variables } from '../types';
 import { INIT_SQL } from '../db/schema';
-import { createPasswordHash, getSettings, hashPassword, resolvePasswordIterations } from '../utils/common';
+import { createPasswordHash, DeploymentSetupError, getSettings, hashPassword, resolvePasswordIterations } from '../utils/common';
 
 const MIN_INITIAL_PASSWORD_LENGTH = 12;
 const LOCAL_DEVELOPMENT_PASSWORD = 'local-development-only';
@@ -67,7 +67,7 @@ export async function initMiddleware(c: Context<{ Bindings: Bindings; Variables:
             // would otherwise allow forging valid session cookies. Production
             // must provide SECRET_KEY as a Worker secret; only localhost may
             // fall back to the auto-generated settings.secret_key.
-            throw new Error('SECRET_KEY is required for non-local deployments: run "npx wrangler secret put SECRET_KEY" before deploying (existing installations must set it before upgrading).');
+            throw new DeploymentSetupError('SECRET_KEY is required for non-local deployments: run "npx wrangler secret put SECRET_KEY" before deploying (existing installations must set it before upgrading).');
         } else {
             try {
                 const dbSecretResult = await c.env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind('secret_key').first<SettingsValueRow>();
@@ -107,10 +107,10 @@ export async function initMiddleware(c: Context<{ Bindings: Bindings; Variables:
             const settings = await getSettings(c.env.DB);
             if (!settings.username || !settings.password) {
                 if (!initialAdminPassword) {
-                    throw new Error('Initial admin unavailable: set INITIAL_ADMIN_PASSWORD before first production login');
+                    throw new DeploymentSetupError('Initial admin unavailable: set INITIAL_ADMIN_PASSWORD before first production login');
                 }
                 if (initialAdminPassword.length < MIN_INITIAL_PASSWORD_LENGTH) {
-                    throw new Error(`Initial admin password must be at least ${MIN_INITIAL_PASSWORD_LENGTH} characters`);
+                    throw new DeploymentSetupError(`Initial admin password must be at least ${MIN_INITIAL_PASSWORD_LENGTH} characters`);
                 }
 
                 const initialAdminPasswordValue = await createInitialAdminPasswordHash(c.env, initialAdminPassword);
@@ -134,10 +134,10 @@ export async function initMiddleware(c: Context<{ Bindings: Bindings; Variables:
             // before the account is allowed to serve authenticated requests.
             if (settings.password === legacyDefaultPasswordHash) {
                 if (!initialAdminPassword) {
-                    throw new Error('Legacy default administrator password detected: set INITIAL_ADMIN_PASSWORD before serving requests');
+                    throw new DeploymentSetupError('Legacy default administrator password detected: set INITIAL_ADMIN_PASSWORD before serving requests');
                 }
                 if (initialAdminPassword.length < MIN_INITIAL_PASSWORD_LENGTH) {
-                    throw new Error(`Legacy default administrator password requires INITIAL_ADMIN_PASSWORD with at least ${MIN_INITIAL_PASSWORD_LENGTH} characters`);
+                    throw new DeploymentSetupError('Legacy default administrator password requires INITIAL_ADMIN_PASSWORD with at least 12 characters');
                 }
                 const migratedHash = await createInitialAdminPasswordHash(c.env, initialAdminPassword);
                 await c.env.DB.prepare('UPDATE settings SET value = ? WHERE key = ?').bind(migratedHash, 'password').run();

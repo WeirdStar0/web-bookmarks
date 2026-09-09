@@ -51,7 +51,8 @@ describe('init', () => {
             }),
         }), productionEnv);
 
-        expect(response.status).toBe(500);
+        expect(response.status).toBe(503);
+        expect(await response.json()).toMatchObject({ error: 'DEPLOYMENT_NOT_INITIALIZED' });
         const db = productionEnv.DB as unknown as MockD1Database;
         expect(db.settings.has('username')).toBe(false);
         expect(db.settings.has('password')).toBe(false);
