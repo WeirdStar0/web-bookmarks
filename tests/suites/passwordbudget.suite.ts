@@ -18,9 +18,10 @@ describe('passwordbudget', () => {
         const stored = db.settings.get('password') ?? '';
         const parsed = parsePasswordHashV3(stored);
         expect(parsed).not.toBeNull();
-        // Production workerd rejects PBKDF2 iteration counts above 100k
-        // (cloudflare/workerd#1346), and the Workers Free plan enforces a
-        // 10 ms CPU budget that even 100k iterations would exceed.
-        expect(parsed!.iterations).toBe(25_000);
+        // Fresh hashes target 90k iterations: measured workerd timings are
+        // 25k=5ms, 90k=15ms, 100k=17ms, the v2 era already ran 100k per login
+        // in production, and workerd rejects counts above 100k
+        // (cloudflare/workerd#1346). See docs/password-v4-design.md.
+        expect(parsed!.iterations).toBe(90_000);
     });
 });

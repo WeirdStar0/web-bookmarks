@@ -5,6 +5,8 @@ export interface Bindings {
     RATE_LIMIT_KV?: KVNamespace;
     SECRET_KEY?: string;
     INITIAL_ADMIN_PASSWORD?: string;
+    PASSWORD_PEPPER?: string;
+    PASSWORD_PEPPER_PREVIOUS?: string;
     ALLOWED_EXTENSION_ORIGINS?: string;
     SESSION_MAX_AGE?: string;
     RATE_LIMIT_MAX?: string;
