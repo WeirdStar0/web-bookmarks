@@ -28,7 +28,8 @@
     "check:migrations": "node scripts/check_migration_files.js",
     "i18n:extension": "node scripts/sync_extension_locale_keys.js",
     "build:ext": "node scripts/build_extensions.js",
-    "check:extension": "npm run build:ext && node scripts/check_extension.js",
+    "test:ext": "node scripts/test_extension_pending_queue.js",
+    "check:extension": "npm run build:ext && npm run test:ext && node scripts/check_extension.js",
     "pretest": "npm run build:app-asset && npm run build:app-css && npm run build:vendor-asset",
     "test": "vitest run"
   },
