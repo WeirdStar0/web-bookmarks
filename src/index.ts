@@ -110,6 +110,9 @@ app.onError((err, c) => {
     // message reveals only deployment state, never credentials, and 503 marks
     // a temporary operator-fixable condition instead of a bug.
     if (err instanceof DeploymentSetupError) {
+        // The missing-SECRET_KEY case is thrown outside the init settings
+        // try/catch, so this branch is the only place it reaches a log.
+        console.warn(`[Deployment Setup]: ${err.message}`);
         return c.json({
             error: 'DEPLOYMENT_NOT_INITIALIZED',
             message: err.message,
