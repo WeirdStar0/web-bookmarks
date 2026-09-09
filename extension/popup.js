@@ -1109,14 +1109,24 @@ function renderFolderSelect(lastFolderId) {
         setTriggerText(trigger, getMessage('selectFolderPlaceholder'));
     }
 
+    // Cycle guard, defensive rather than load-bearing: with a single parent
+    // pointer a cycle has no `parent_id = null` entry point, so this walk
+    // cannot reach it today and such folders simply do not appear. Rendering
+    // orphan subtrees later would make them reachable, and the visited set
+    // costs one lookup per node, so it is kept up front.
+    const visitedFolders = new Set();
+    const visibleChildrenOf = (parentId) => folders
+        .filter(f => f.parent_id === parentId && !visitedFolders.has(f.id))
+        .sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
+
     const buildTree = (parentId, parentEl, level = 1) => {
-        const children = folders.filter(f => f.parent_id === parentId)
-            .sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
+        const children = visibleChildrenOf(parentId);
 
         if (children.length === 0) return;
 
         children.forEach(folder => {
-            const hasChildren = folders.some(f => f.parent_id === folder.id);
+            visitedFolders.add(folder.id);
+            const hasChildren = visibleChildrenOf(folder.id).length > 0;
 
             const nodeDiv = document.createElement('div');
             const rowDiv = document.createElement('div');
