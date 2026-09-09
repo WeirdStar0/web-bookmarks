@@ -72,9 +72,12 @@ npx wrangler kv namespace create RATE_LIMIT_KV
 Set secrets interactively or through a protected CI environment:
 
 ```bash
+openssl rand -base64 32
 npx wrangler secret put SECRET_KEY
 npx wrangler secret put INITIAL_ADMIN_PASSWORD
 ```
+
+`SECRET_KEY` is mandatory for production: on a non-localhost host every request fails closed until it exists. Installations upgrading from a version that auto-generated a D1-managed `secret_key` must set the Worker secret **before** deploying this version — the new version no longer reads the D1-managed secret.
 
 `INITIAL_ADMIN_PASSWORD` must be a unique strong password of at least 12 characters. Never use the local development fallback in production and never put the value in `.dev.vars`, `wrangler.toml`, GitHub logs, screenshots, or issue reports.
 

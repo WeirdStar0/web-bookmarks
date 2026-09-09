@@ -63,6 +63,7 @@ Click the **Deploy to Cloudflare Workers** button. It will:
 **What happens after deployment:**
 *   Database and indexes are initialized automatically on first visit.
 *   Set `INITIAL_ADMIN_PASSWORD` before the first production login; otherwise no default admin account is created.
+*   `SECRET_KEY` is mandatory in production: add it in the Worker settings (Settings → Variables → Secrets) after one-click deployment; requests fail closed with setup instructions until it exists.
 
 ---
 
@@ -168,7 +169,7 @@ Use `npm run check` as the pre-commit and pre-deploy quality gate. It runs asset
 ### Configure Rate Limiting (Required for Production)
 1. Create KV: `npx wrangler kv namespace create RATE_LIMIT_KV`.
 2. Add the returned real namespace ID to the active `[[kv_namespaces]]` block in `wrangler.toml`.
-3. Set production secrets with `npx wrangler secret put SECRET_KEY` and `npx wrangler secret put INITIAL_ADMIN_PASSWORD`.
+3. Set production secrets with `npx wrangler secret put SECRET_KEY` and `npx wrangler secret put INITIAL_ADMIN_PASSWORD`; `SECRET_KEY` is mandatory in production and the service fails closed without it.
 4. Run `npm run deploy:check` (local migration-file and production-binding checks), deploy with `npx wrangler deploy` or `npm run deploy`, then confirm the remote migration ledger with `npm run verify:remote-migrations`.
 
 Without this binding, or when the bound KV fails at runtime, `/api/login` fails closed with `503`; this prevents the login endpoint from degrading into an unprotected brute-force target. The pre-deploy check also blocks publication when the KV binding is absent.
@@ -233,6 +234,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 - Ensure `SECRET_KEY` is set via `npx wrangler secret put`.
 - If key changed, clear cookies and relogin.
 - If you regenerated the extension `key`, update `ALLOWED_EXTENSION_ORIGINS` with the new `chrome-extension://...` value too.
+- **Upgrade note**: production (non-localhost) deployments now require `SECRET_KEY` and no longer fall back to the D1-managed `secret_key`. Existing installations must set the Worker secret **before** deploying this version — set the secret first, then deploy; otherwise every request fails closed.
 
 ### 3. Reset Password
 Passwords are stored as hashes, so writing plaintext into `settings.password` is no longer valid.

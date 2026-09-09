@@ -61,6 +61,13 @@ export async function initMiddleware(c: Context<{ Bindings: Bindings; Variables:
     if (!instanceSecret) {
         if (envSecret) {
             instanceSecret = envSecret;
+        } else if (!isLocalDevelopment) {
+            // Fail closed: the D1-managed secret lives in the same database as
+            // the password hash and session_version, so a read-only D1 leak
+            // would otherwise allow forging valid session cookies. Production
+            // must provide SECRET_KEY as a Worker secret; only localhost may
+            // fall back to the auto-generated settings.secret_key.
+            throw new Error('SECRET_KEY is required for non-local deployments: run "npx wrangler secret put SECRET_KEY" before deploying (existing installations must set it before upgrading).');
         } else {
             try {
                 const dbSecretResult = await c.env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind('secret_key').first<SettingsValueRow>();
@@ -84,7 +91,7 @@ export async function initMiddleware(c: Context<{ Bindings: Bindings; Variables:
                     }
                 }
             } catch {
-                throw new Error('Session secret unavailable: set SECRET_KEY or ensure DB secret_key is readable');
+                throw new Error('Local session secret unavailable: set SECRET_KEY in .dev.vars or ensure DB secret_key is readable');
             }
         }
     }

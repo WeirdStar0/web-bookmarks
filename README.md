@@ -65,6 +65,7 @@
 **部署后的结果：**
 *   数据库和索引会在首次访问时自动初始化。
 *   首次生产登录前必须设置 `INITIAL_ADMIN_PASSWORD`，否则不会创建默认管理员账号。
+*   生产环境强制要求 `SECRET_KEY`：一键部署完成后，请在 Worker 的设置中添加 `SECRET_KEY`（Settings → Variables → Secrets），缺失时请求会失败并提示设置方法。
 
 ---
 
@@ -177,7 +178,7 @@ npm run db:migrate:remote
 为避免登录端点在缺少限流时暴露给暴力破解，生产部署必须绑定 KV 存储：
 1. 创建 KV 命名空间：`npx wrangler kv namespace create RATE_LIMIT_KV`
 2. 将返回的真实 `id` 填入 `wrangler.toml` 中启用的 `[[kv_namespaces]]` 配置块。
-3. 使用 `npx wrangler secret put SECRET_KEY` 和 `npx wrangler secret put INITIAL_ADMIN_PASSWORD` 设置生产密钥。
+3. 使用 `npx wrangler secret put SECRET_KEY` 和 `npx wrangler secret put INITIAL_ADMIN_PASSWORD` 设置生产密钥；`SECRET_KEY` 为生产强制项，未设置时服务会失败关闭。
 4. 运行 `npm run deploy:check` 确认迁移文件与生产绑定配置通过，执行 `npx wrangler deploy` 后用 `npm run verify:remote-migrations` 复核远程迁移账本。
 
 若未完成绑定，或者已绑定的 KV 在运行时读写失败，`/api/login` 都会返回 `503`；这能避免限流不可用时登录端点退化为可暴力破解状态。部署前检查同样会阻止未绑定 KV 的发布。
@@ -249,6 +250,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 - 确保生产环境的 `SECRET_KEY` 已通过 `npx wrangler secret put SECRET_KEY` 设置，且与本地一致。
 - 如果更换了密钥，请清除浏览器 Cookie 后重新登录。
 - 如果你重新生成过扩展 `key`，也要同步更新 `ALLOWED_EXTENSION_ORIGINS` 里的 `chrome-extension://...`。
+- **升级注意**：生产（非 localhost）环境现在强制要求 `SECRET_KEY`，且不再回退读取 D1 内自动生成的 `secret_key`。旧安装必须先设置 Worker Secret 再部署新版本（先设 Secret，再部署），否则所有请求都会失败关闭。
 
 ### 3. 如何重置密码？
 当前密码在数据库中以哈希形式存储，不能直接把明文密码写进 `settings.password`。
