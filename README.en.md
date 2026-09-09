@@ -184,6 +184,21 @@ The following optional variables can be configured in the Cloudflare Dashboard o
 | `RATE_LIMIT_LOGIN_MAX` | 5 | 1–100 |
 | `RATE_LIMIT_LOGIN_WINDOW` (seconds) | 60 | 1–86400 |
 
+### Password Hashing Hardening (PASSWORD_PEPPER, recommended)
+
+The v4 password hash format mixes a **pepper** into the derivation — secret material that exists only in Workers Secrets and never in D1. Even a full database leak then leaves an attacker unable to verify the password, let alone crack it offline. Fresh hashes also raise PBKDF2 to 90,000 iterations (measured at 15 ms in workerd, keeping headroom under the 100k hard rejection).
+
+Setup (value format `<id>:<material>`, with a 1–16 character alphanumeric id that must be unique per rotation):
+
+```bash
+openssl rand -base64 32
+npx wrangler secret put PASSWORD_PEPPER   # enter k1:<the output>
+```
+
+The next successful login migrates the stored hash to v4 automatically; password changes and initial admin creation produce v4 directly. Without a pepper the system keeps working (v3, 90,000 iterations), so this is recommended rather than required.
+
+**Rotation**: generate a new id (e.g. `k2:<fresh random material>`) into `PASSWORD_PEPPER`, move the previous full value into `PASSWORD_PEPPER_PREVIOUS`, and log in once — the stored hash is re-hashed to the current id, after which `PASSWORD_PEPPER_PREVIOUS` can be removed. Never reuse an id and never change the material while keeping an id. **Losing the pepper** makes the corresponding hash unverifiable and login fails closed; the only recovery is the documented reset path (delete the `password` row in `settings`, then re-initialize with `INITIAL_ADMIN_PASSWORD`). See [`docs/password-v4-design.md`](docs/password-v4-design.md).
+
 ### Folder and Data-Loading Bounds
 
 The folder tree is limited to **12 levels** (with a root folder counted as level 1). The limit applies to both creating a folder and moving a folder containing descendants. A violating request returns `400` with `FOLDER_DEPTH_LIMIT`, protecting recursive export, counts, and folder selectors from pathological nesting.
