@@ -141,11 +141,14 @@ configuration:
 
 | Current pepper | Stored hash | Upgrade target |
 |---|---|---|
-| valid | v4 (current id, configured factor) | none — already current |
-| valid | v4 (old id) / v3 / v2 / v1 | `v4:<current id>:<configured factor>:...` |
+| valid | v4 (current id, factor ≥ configured) | none — already current |
+| valid | v4 (old id) / v3 / v2 / v1 | `v4:<current id>:<max(stored, configured)>:...` |
 | absent | v3 @ configured factor | none — already current |
-| absent | v3 @ other factor / v2 / v1 | `v3:<configured factor>:...` |
+| absent | v3 @ other factor / v2 / v1 | `v3:<max(stored, configured)>:...` |
 | malformed | any | none — verification still works (v4 via `PREVIOUS`), writes fail closed |
+
+`max(stored, configured)` preserves v2's implicit 100,000; v1 has no stored
+factor and targets the configured factor.
 
 The upgrade is a single conditional write,
 `UPDATE settings SET value = ? WHERE key = 'password' AND value = <expected>`,
