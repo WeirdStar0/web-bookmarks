@@ -1,9 +1,25 @@
+import type { Context } from 'hono';
 import type { ApiApp } from './types';
 import { BOOKMARK_PUBLIC_COLUMNS, FOLDER_PUBLIC_COLUMNS } from './columns';
 import { idSchema } from '../utils/schemas';
 import { err, ErrCode, getSessionVersion } from '../utils/common';
+import type { Bindings, Variables } from '../types';
 
 const MAX_SEARCH_QUERY_LENGTH = 200;
+
+type DataContext = Context<{ Bindings: Bindings; Variables: Variables }>;
+
+/**
+ * Resolve the deferred hot-read session check started by the auth middleware.
+ * Both routes overlap the session-version query with their reads, so every
+ * response path must await this before answering: a signed cookie from a
+ * revoked session must never receive even an empty success payload.
+ */
+async function hasValidHotReadSession(c: DataContext): Promise<boolean> {
+    const cookie = c.get('sessionVersionCookie');
+    const sessionVersion = await (c.get('sessionVersionPromise') || getSessionVersion(c.env.DB));
+    return Boolean(cookie) && cookie === sessionVersion;
+}
 
 export function registerDataRoutes(app: ApiApp) {
     app.get('/data', async (c) => {
@@ -18,11 +34,10 @@ export function registerDataRoutes(app: ApiApp) {
             folderId = folderResult.data;
         }
 
-        const sessionVersionCookie = c.get('sessionVersionCookie');
-        const sessionVersionPromise = c.get('sessionVersionPromise') || getSessionVersion(c.env.DB);
+        const sessionCheck = hasValidHotReadSession(c);
         const foldersPromise = c.env.DB.prepare(`SELECT ${FOLDER_PUBLIC_COLUMNS} FROM folders WHERE is_deleted = 0 ORDER BY sort_order ASC, name ASC`).all();
-        const [sessionVersion, { results: folders }] = await Promise.all([sessionVersionPromise, foldersPromise]);
-        if (!sessionVersionCookie || sessionVersionCookie !== sessionVersion) {
+        const [sessionValid, { results: folders }] = await Promise.all([sessionCheck, foldersPromise]);
+        if (!sessionValid) {
             return c.json(err(ErrCode.UNAUTHORIZED, 'Unauthorized'), 401);
         }
         if (folderId !== null && !folders.some((folder) => Number(folder.id) === folderId)) {
@@ -50,11 +65,20 @@ export function registerDataRoutes(app: ApiApp) {
     });
 
     app.get('/search', async (c) => {
+        const sessionCheck = hasValidHotReadSession(c);
         const query = c.req.query('q')?.trim() || '';
         if (!query) {
+            // Even the empty result must pass the session check so a revoked
+            // cookie cannot be distinguished from a logged-in one by status.
+            if (!await sessionCheck) {
+                return c.json(err(ErrCode.UNAUTHORIZED, 'Unauthorized'), 401);
+            }
             return c.json({ bookmarks: [] });
         }
         if (query.length > MAX_SEARCH_QUERY_LENGTH) {
+            // Settle the already-started check before rejecting so no spawned
+            // read is left dangling behind the validation error.
+            await sessionCheck;
             return c.json(err(ErrCode.VALIDATION, `Search query must not exceed ${MAX_SEARCH_QUERY_LENGTH} characters`), 400);
         }
 
@@ -62,20 +86,18 @@ export function registerDataRoutes(app: ApiApp) {
         const escaped = query.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 
         const pattern = `%${escaped}%`;
-        const sessionVersionCookie = c.get('sessionVersionCookie');
-        const sessionVersionPromise = c.get('sessionVersionPromise') || getSessionVersion(c.env.DB);
         const foldersPromise = c.env.DB.prepare(
             `SELECT ${FOLDER_PUBLIC_COLUMNS} FROM folders WHERE is_deleted = 0 AND name LIKE ? ESCAPE '\\' ORDER BY sort_order ASC, name ASC LIMIT 50`,
         ).bind(pattern).all();
         const bookmarksPromise = c.env.DB.prepare(
             `SELECT ${BOOKMARK_PUBLIC_COLUMNS} FROM bookmarks WHERE is_deleted = 0 AND (title LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\') ORDER BY sort_order ASC, created_at DESC LIMIT 50`,
         ).bind(pattern, pattern, pattern).all();
-        const [sessionVersion, { results: folders }, { results: bookmarks }] = await Promise.all([
-            sessionVersionPromise,
+        const [sessionValid, { results: folders }, { results: bookmarks }] = await Promise.all([
+            sessionCheck,
             foldersPromise,
             bookmarksPromise,
         ]);
-        if (!sessionVersionCookie || sessionVersionCookie !== sessionVersion) {
+        if (!sessionValid) {
             return c.json(err(ErrCode.UNAUTHORIZED, 'Unauthorized'), 401);
         }
 
