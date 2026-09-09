@@ -6,22 +6,35 @@ type SettingsRow = {
     value: string;
 };
 
-// New hashes target 90k iterations. Measured in workerd (vitest-pool-workers):
-// 25k=5ms, 50k=11ms, 90k=15ms, 100k=17ms; the v2 era already ran 100k in
-// production on every login, and workerd rejects counts above 100k
-// (cloudflare/workerd#1346), so 90k keeps 10% headroom. Login is a
-// rate-limited per-attempt cost, not a hot path, and stored hashes keep their
-// own iteration count, so this constant can be raised again without a
-// migration. The 12-character minimum password, per-IP login rate limiting,
-// the pepper (when configured), and the single-account threat model remain
-// the primary compensations.
-export const PASSWORD_HASH_ITERATIONS = 90_000;
+// Workers Free enforces a 10 ms CPU budget per HTTP invocation, and a
+// migration login can run two derivations (verify at the stored factor plus
+// the re-hash). 25k is therefore the default: it is the only factor with
+// production evidence under that budget (the v1→v3 migration already ran two
+// 25k derivations per migration login; measured workerd reference timings:
+// 25k=5ms, 50k=11ms, 90k=15ms, 100k=17ms). Deployments on Paid plans, or that
+// have verified their own CPU budget, can opt into up to 100k with the
+// PASSWORD_HASH_ITERATIONS variable; stored hashes keep their own iteration
+// count, so changing the variable migrates hashes lazily on login.
+export const PASSWORD_HASH_DEFAULT_ITERATIONS = 25_000;
 // Production workerd rejects PBKDF2 derivations above 100k iterations
 // (cloudflare/workerd#1346), so stored hashes claiming more can never be
 // verified; the parsers treat them as invalid instead of 500-ing inside
-// deriveBits.
+// deriveBits. The configured work factor shares this ceiling.
 const PASSWORD_HASH_ITERATIONS_MAX = 100_000;
+const PASSWORD_HASH_ITERATIONS_MIN = 25_000;
 const MIN_PEPPER_MATERIAL_LENGTH = 32;
+
+// The configured work factor for fresh hashes and the migration target.
+// Malformed or out-of-range values fall back to the Free-safe default,
+// matching how the other bounded variables behave.
+export function resolvePasswordIterations(env: Bindings): number {
+    return getBoundedPositiveInteger(
+        env.PASSWORD_HASH_ITERATIONS,
+        PASSWORD_HASH_DEFAULT_ITERATIONS,
+        PASSWORD_HASH_ITERATIONS_MIN,
+        PASSWORD_HASH_ITERATIONS_MAX,
+    );
+}
 
 // V1: SHA-256 (legacy only; migrate after a successful login)
 export async function hashPassword(password: string): Promise<string> {
@@ -41,7 +54,7 @@ export async function hashPasswordV2(password: string, saltHex?: string): Promis
 // V3: PBKDF2-SHA256 with an explicit, upgradeable work factor.
 export async function hashPasswordV3(
     password: string,
-    iterations = PASSWORD_HASH_ITERATIONS,
+    iterations: number,
     saltHex?: string,
 ): Promise<{ hash: string; salt: string; iterations: number }> {
     return derivePasswordHash(password, iterations, saltHex);
@@ -131,7 +144,7 @@ function formatPasswordHashV4({ pepperId, iterations, salt, hash }: { pepperId: 
 export async function hashPasswordV4(
     password: string,
     pepper: PasswordPepper,
-    iterations = PASSWORD_HASH_ITERATIONS,
+    iterations: number,
     saltHex?: string,
 ): Promise<{ hash: string; salt: string; iterations: number; pepperId: string }> {
     const result = await derivePasswordHash(password, iterations, saltHex, pepper.material);
@@ -145,13 +158,13 @@ export async function hashPasswordV4(
 // operator noticing. Fix the secret (or remove it for v3) and retry.
 export async function createPasswordHash(env: Bindings, password: string): Promise<string> {
     if (!env.PASSWORD_PEPPER) {
-        return serializePasswordHashV3(await hashPasswordV3(password));
+        return serializePasswordHashV3(await hashPasswordV3(password, resolvePasswordIterations(env)));
     }
     const pepper = resolveCurrentPepper(env);
     if (!pepper) {
         throw new Error('PASSWORD_PEPPER is configured but malformed: fix it (or remove it to use unpeppered v3 hashes) before changing passwords.');
     }
-    return formatPasswordHashV4(await hashPasswordV4(password, pepper));
+    return formatPasswordHashV4(await hashPasswordV4(password, pepper, resolvePasswordIterations(env)));
 }
 
 export type StoredPasswordVerifyResult = { ok: boolean; needsUpgrade: boolean };
@@ -174,7 +187,7 @@ export async function verifyStoredPassword(env: Bindings, storedValue: string, p
         // pepper absent or malformed, the stored hash stays exactly as it is.
         const current = resolveCurrentPepper(env);
         const needsUpgrade = ok && Boolean(current)
-            && (pepper.id !== current!.id || parsed.iterations !== PASSWORD_HASH_ITERATIONS);
+            && (pepper.id !== current!.id || parsed.iterations !== resolvePasswordIterations(env));
         return { ok, needsUpgrade };
     }
     if (storedValue.startsWith('v3:')) {
@@ -189,7 +202,7 @@ export async function verifyStoredPassword(env: Bindings, storedValue: string, p
         const current = resolveCurrentPepper(env);
         const upgradeTargetReady = Boolean(current) || !env.PASSWORD_PEPPER;
         const needsUpgrade = ok && upgradeTargetReady
-            && (Boolean(current) || parsed.iterations !== PASSWORD_HASH_ITERATIONS);
+            && (Boolean(current) || parsed.iterations !== resolvePasswordIterations(env));
         return { ok, needsUpgrade };
     }
     if (storedValue.startsWith('v2:')) {

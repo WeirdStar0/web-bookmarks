@@ -12,6 +12,7 @@ function pepperEnv(pepper: string, previous?: string) {
     return {
         ...createEnv(),
         PASSWORD_PEPPER: pepper,
+        PASSWORD_HASH_ITERATIONS: '90000',
         ...(previous ? { PASSWORD_PEPPER_PREVIOUS: previous } : {}),
     };
 }
@@ -52,7 +53,7 @@ describe('passwordv4', () => {
         const peppered = pepperEnv(`k2:${PEPPER_MATERIAL}`);
         const db = peppered.DB as unknown as MockD1Database;
         db.settings.set('username', 'admin');
-        const foreign = await hashPasswordV4(TEST_INITIAL_ADMIN_PASSWORD, { id: 'k9', material: PEPPER_MATERIAL });
+        const foreign = await hashPasswordV4(TEST_INITIAL_ADMIN_PASSWORD, { id: 'k9', material: PEPPER_MATERIAL }, 90_000);
         const storedValue = formatV4('k9', foreign);
         db.settings.set('password', storedValue);
 
@@ -65,7 +66,7 @@ describe('passwordv4', () => {
         const rotated = pepperEnv(`k2:${PEPPER_MATERIAL}`, `k1:${PEPPER_MATERIAL}`);
         const db = rotated.DB as unknown as MockD1Database;
         db.settings.set('username', 'admin');
-        const old = await hashPasswordV4(TEST_INITIAL_ADMIN_PASSWORD, { id: 'k1', material: PEPPER_MATERIAL });
+        const old = await hashPasswordV4(TEST_INITIAL_ADMIN_PASSWORD, { id: 'k1', material: PEPPER_MATERIAL }, 90_000);
         db.settings.set('password', formatV4('k1', old));
 
         const response = await postLogin(rotated, TEST_INITIAL_ADMIN_PASSWORD);

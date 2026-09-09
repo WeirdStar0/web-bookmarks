@@ -32,7 +32,11 @@ describe('passwordmigration', () => {
     });
 
     it('migrates a legacy v3 hash to v4 on successful login', async () => {
-        const peppered = { ...createEnv(), PASSWORD_PEPPER: `k1:${PEPPER_MATERIAL}` };
+        const peppered = {
+            ...createEnv(),
+            PASSWORD_PEPPER: `k1:${PEPPER_MATERIAL}`,
+            PASSWORD_HASH_ITERATIONS: '90000',
+        };
         const db = peppered.DB as unknown as MockD1Database;
         const storedValue = await seedLegacyV3(db);
 
@@ -43,11 +47,12 @@ describe('passwordmigration', () => {
         expect(db.settings.get('password')).not.toBe(storedValue);
     });
 
-    it('migrates a legacy v3 hash to a stronger v3 when no pepper is configured', async () => {
-        const db = env.DB as unknown as MockD1Database;
+    it('migrates a legacy v3 hash to a stronger v3 when a higher factor is configured', async () => {
+        const configured = { ...createEnv(), PASSWORD_HASH_ITERATIONS: '90000' };
+        const db = configured.DB as unknown as MockD1Database;
         await seedLegacyV3(db);
 
-        const response = await postLogin(env, TEST_INITIAL_ADMIN_PASSWORD);
+        const response = await postLogin(configured, TEST_INITIAL_ADMIN_PASSWORD);
         expect(response.status).toBe(200);
         expect(await response.json()).toMatchObject({ success: true, migrated: true });
         expect(parsePasswordHashV3(db.settings.get('password') ?? '')).toMatchObject({ iterations: 90_000 });
@@ -55,7 +60,7 @@ describe('passwordmigration', () => {
 
     it('leaves an already-current v3 hash untouched when no pepper is configured', async () => {
         const db = env.DB as unknown as MockD1Database;
-        const current = serializePasswordHashV3(await hashPasswordV3(TEST_INITIAL_ADMIN_PASSWORD, 90_000, LEGACY_SALT));
+        const current = serializePasswordHashV3(await hashPasswordV3(TEST_INITIAL_ADMIN_PASSWORD, 25_000, LEGACY_SALT));
         db.settings.set('username', 'admin');
         db.settings.set('password', current);
 

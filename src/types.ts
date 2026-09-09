@@ -7,6 +7,7 @@ export interface Bindings {
     INITIAL_ADMIN_PASSWORD?: string;
     PASSWORD_PEPPER?: string;
     PASSWORD_PEPPER_PREVIOUS?: string;
+    PASSWORD_HASH_ITERATIONS?: string;
     ALLOWED_EXTENSION_ORIGINS?: string;
     SESSION_MAX_AGE?: string;
     RATE_LIMIT_MAX?: string;
