@@ -25,23 +25,36 @@ hard limit.
 | v3 | `v3:<iterations>:<saltHex32>:<hashHex64>` | current stored format since 1.1.0 |
 | v4 | `v4:<pepperId>:<iterations>:<saltHex32>:<hashHex64>` | this change |
 
-Derivation for v4 is PBKDF2-SHA256 over `<password>:<pepperMaterial>` with a
-fresh 16-byte salt and a 256-bit output — the same primitive as v3, with the
-pepper appended to the key material. The colon separator prevents ambiguity
-between password and pepper.
+Both v3 and v4 parsers reject stored hashes claiming more than 100,000
+iterations — the workerd derivation limit — so such hashes fail as a clean 401
+instead of a 500 from `deriveBits`.
+
+Derivation for v4 is PBKDF2-SHA256 over an HMAC-SHA-256 prehash —
+`prehash = HMAC-SHA-256(key = pepperMaterial, message = password)`, then
+`hash = PBKDF2-SHA256(prehash, salt, iterations)` with a fresh 16-byte salt and
+a 256-bit output. Using the pepper as the HMAC key gives unambiguous domain
+separation (no delimiter collisions — both passwords and pepper material may
+contain `:`) and a fixed-size PBKDF2 input. An interop test re-derives a hash
+with raw Web Crypto calls to pin the construction.
 
 ### Work factor
 
-All new hashes (v3 and v4) use `PASSWORD_HASH_ITERATIONS = 90,000`.
+Fresh hashes use `resolvePasswordIterations(env)`: the `PASSWORD_HASH_ITERATIONS`
+variable, bounded to 25,000–100,000, defaulting to **25,000**.
 
-Measured in workerd via vitest-pool-workers on the reference dev machine:
-25k = 5 ms, 50k = 11 ms, 90k = 15 ms, 100k = 17 ms. Production workerd already
-ran 100,000 iterations at every login for the v2 era, so 90,000 is a proven
-operating point, and it keeps 10% headroom below the workerd rejection limit
-(cloudflare/workerd#1346). Login is a rate-limited, per-attempt cost (5/min/IP),
-not a hot path. The constant is safe to raise in a future release without a
-migration: the format stores explicit iterations and verification uses the
-stored value.
+The Workers Free plan enforces a 10 ms CPU budget per HTTP invocation, and a
+migration login can run two derivations (verify at the stored factor plus the
+re-hash). 25,000 is therefore the only default with production evidence under
+that budget: the v1→v3 migration already ran two 25,000-iteration derivations
+per migration login. Measured workerd timings (vitest-pool-workers, reference
+dev machine) are 25k = 5 ms, 50k = 11 ms, 90k = 15 ms, 100k = 17 ms; they are
+reference data, not proof about production CPU accounting. Deployments on Paid
+plans — or that have verified their own budget — can opt into up to 100,000
+(workerd rejects derivations above 100k, cloudflare/workerd#1346, and the
+parsers reject stored hashes claiming more). Malformed or out-of-range values
+fall back to the default. Stored hashes keep their own iteration count, so
+changing the variable migrates hashes lazily on login; login remains a
+rate-limited, per-attempt cost.
 
 ## Pepper secrets
 
@@ -72,18 +85,36 @@ verification fail closed — the login returns 401 like a wrong password. There
 is no fallback: correctness of the supplied password cannot be established
 without its pepper.
 
-Rotation procedure (single-admin deployment, zero downtime):
+Rotation procedure (single-admin deployment, zero downtime). `wrangler secret
+put` creates and deploys a new Worker version immediately, and secret values
+can never be read back afterwards, so the order below — `PREVIOUS` first — is
+what keeps every stored hash verifiable at every moment:
 
+0. Keep the **current full pepper value** (`k1:...`) in a password manager or
+   secret manager. Without it rotation is impossible, and losing a pepper means
+   losing the password.
 1. Generate a fresh id and material: `k2:$(openssl rand -base64 32)`.
-2. `npx wrangler secret put PASSWORD_PEPPER` → the new full value.
-3. `npx wrangler secret put PASSWORD_PEPPER_PREVIOUS` → the **previous** full
-   value (`k1:...`).
+2. `npx wrangler secret put PASSWORD_PEPPER_PREVIOUS` → the **old** full value
+   (`k1:...`). From this moment every stored `v4:k1` hash also verifies through
+   `PREVIOUS`; nothing is disrupted.
+3. `npx wrangler secret put PASSWORD_PEPPER` → the **new** full value (`k2:...`).
 4. Log in once. The successful login re-hashes the stored hash to `k2`.
 5. After that login, `PASSWORD_PEPPER_PREVIOUS` can be removed.
 
+Setting `PASSWORD_PEPPER` first (the intuitive order) would leave stored
+`v4:k1` hashes with no resolvable pepper between the two commands, rejecting
+logins until `PREVIOUS` is set.
+
 Rules that keep this safe:
 
-- Never change the material while keeping an id, and never reuse an id.
+- Never reuse an id, and never change a pepper's material while keeping an id.
+- Hard invariant: the system never rewrites a v4 hash as v3. A verified v4 is
+  re-hashed only while a valid current pepper exists; with the pepper absent or
+  malformed the stored hash is left untouched.
+- A configured-but-malformed pepper is distinct from an unset one: unset keeps
+  producing (unpeppered) v3 hashes, malformed fails closed on password writes
+  (500) and offers no upgrade target, so the misconfiguration cannot silently
+  downgrade security.
 - Removing `PASSWORD_PEPPER` while v4 hashes exist locks the account (fail
   closed); recovery is the documented password reset path (delete the
   `password` settings row, redeploy with `INITIAL_ADMIN_PASSWORD`).
@@ -97,12 +128,13 @@ On **successful** verification only (a failed attempt never rewrites anything),
 the stored hash is upgraded to the best available format for the current
 configuration:
 
-| Configured pepper | Stored hash | Upgrade target |
+| Current pepper | Stored hash | Upgrade target |
 |---|---|---|
-| yes | v4 (current id, current iterations) | none — already current |
-| yes | v4 (old id) / v3 / v2 / v1 | `v4:<current id>:<90k>:...` |
-| no | v3 @ 90,000 | none — already current |
-| no | v3 @ lower / v2 / v1 | `v3:90000:...` |
+| valid | v4 (current id, configured factor) | none — already current |
+| valid | v4 (old id) / v3 / v2 / v1 | `v4:<current id>:<configured factor>:...` |
+| absent | v3 @ configured factor | none — already current |
+| absent | v3 @ other factor / v2 / v1 | `v3:<configured factor>:...` |
+| malformed | any | none — verification still works (v4 via `PREVIOUS`), writes fail closed |
 
 The upgrade is a single conditional write,
 `UPDATE settings SET value = ? WHERE key = 'password' AND value = <expected>`,
@@ -124,7 +156,8 @@ so a concurrent credential change (or a concurrent migration) is detected by
 The order inside the login handler is: verify → (if needed) conditional upgrade
 → issue cookie. The upgrade derive therefore happens before the cookie is
 issued, exactly like the legacy v1/v2 path it replaces; its cost is bounded by
-the 90k benchmark above and is skipped entirely on already-current hashes.
+the configured work factor (benchmarks above) and is skipped entirely on
+already-current hashes.
 
 ## Create paths
 
@@ -136,12 +169,18 @@ default-password replacement (init middleware), and `PUT /api/settings`.
 
 ## Test coverage
 
-- v4 format parse/format/validation, pepper resolution and invalid-value handling
+- v4 format parse/format/validation, pepper resolution, invalid-value handling,
+  and the 100k parser ceiling (`100001 → fail closed`) for v3 and v4
 - login with pepper creates v4; wrong pepper id fails closed; rotation via
   `PASSWORD_PEPPER_PREVIOUS` verifies and re-hashes to the current id
-- v3 → v4 login migration (hash replaced, `migrated: true`), v3 → v3@90k when
-  no pepper is configured
+- downgrade protection: `PREVIOUS`-only verification and malformed-current
+  verification keep the v4 hash byte-for-byte; malformed current fails
+  password writes closed
+- HMAC prehash construction pinned by an interop test using raw Web Crypto
+- v3 → v4 login migration (`migrated: true`), v3 → v3 at a configured higher
+  factor, and no-op when the stored hash is already current
 - v1/v2 legacy migrations keep their concurrency-abort semantics
 - storage failure during the migration write does not fail the login
 - settings change and initial admin creation honor the pepper configuration
-- budget: fresh hashes derive at the configured work factor
+- work factor: fresh hashes use the Free-safe default and honor an in-range
+  `PASSWORD_HASH_ITERATIONS` (falling back out of range)

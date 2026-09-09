@@ -17,6 +17,9 @@ INITIAL_ADMIN_PASSWORD=replace-with-a-strong-initial-password
 # PASSWORD_PEPPER=k1:replace-with-random-material
 # PASSWORD_PEPPER_PREVIOUS=k0:previous-value-only-kept-during-rotation
 
+# 可选:新口令哈希的 PBKDF2 迭代数(25000–100000,默认 25000;Paid 计划可调高)
+# PASSWORD_HASH_ITERATIONS=90000
+
 # 可选:会话过期时间(秒),默认 7 天 (604800)
 # SESSION_MAX_AGE=604800
 

@@ -85,7 +85,14 @@ npx wrangler secret put INITIAL_ADMIN_PASSWORD
 
 `PASSWORD_PEPPER` (optional but recommended) mixes a D1-external secret into the stored password hash, so a database-only leak cannot verify or crack it. Values are `<id>:<material>` with a unique alphanumeric id per rotation and `openssl rand -base64 32` as the material. Setting it is not upgrade-breaking: the next successful login migrates the stored hash to the peppered v4 format.
 
-Rotate by generating a fresh id and material into `PASSWORD_PEPPER`, moving the previous full value into `PASSWORD_PEPPER_PREVIOUS`, and logging in once; `PASSWORD_PEPPER_PREVIOUS` can be removed afterwards. Removing `PASSWORD_PEPPER` while v4 hashes exist locks the account — the recovery path is the password reset procedure (delete the `password` settings row, then re-initialize with `INITIAL_ADMIN_PASSWORD`). See `docs/password-v4-design.md` for the full format and semantics.
+Rotate in this order — `wrangler secret put` deploys immediately and secret values cannot be read back afterwards, so keep the current full pepper in a password manager or secret manager first:
+
+1. Write the **old** full value into `PASSWORD_PEPPER_PREVIOUS`. Every stored hash stays verifiable from this moment.
+2. Write the fresh id and material into `PASSWORD_PEPPER`.
+3. Log in once; the stored hash is re-hashed to the new id.
+4. Remove `PASSWORD_PEPPER_PREVIOUS`.
+
+Removing `PASSWORD_PEPPER` while v4 hashes exist locks the account — the recovery path is the password reset procedure (delete the `password` settings row, then re-initialize with `INITIAL_ADMIN_PASSWORD`). See `docs/password-v4-design.md` for the full format and semantics.
 
 ## 5. Release and smoke test
 

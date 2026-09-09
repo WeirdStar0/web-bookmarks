@@ -193,10 +193,11 @@ npm run db:migrate:remote
 | `RATE_LIMIT_WINDOW`（秒） | 60 | 1–86400 |
 | `RATE_LIMIT_LOGIN_MAX` | 5 | 1–100 |
 | `RATE_LIMIT_LOGIN_WINDOW`（秒） | 60 | 1–86400 |
+| `PASSWORD_HASH_ITERATIONS`（次） | 25000 | 25000–100000 |
 
 ### 密码哈希加固（PASSWORD_PEPPER，推荐）
 
-密码哈希的 v4 格式会在派生时混入一个 **pepper**——一段只存在于 Worker Secrets、绝不写入 D1 的密钥材料。这样即使 D1 数据整体泄露，攻击者没有 pepper 也无法校验口令，更谈不上离线爆破。新口令哈希同时将 PBKDF2 迭代数提升到 90,000（workerd 实测 15ms，保留 100k 硬拒绝的余量）。
+密码哈希的 v4 格式会在派生时混入一个 **pepper**——一段只存在于 Worker Secrets、绝不写入 D1 的密钥材料。这样即使 D1 数据整体泄露，攻击者没有 pepper 也无法校验口令，更谈不上离线爆破。新口令哈希的 PBKDF2 迭代数默认 25,000（Workers Free 每次 10ms CPU 预算下的保守默认），可通过 `PASSWORD_HASH_ITERATIONS` 变量调整（25,000–100,000，超出范围自动回退默认；Paid 计划可设为 90000），存量哈希会在下次成功登录时自动迁移到新配置。
 
 设置（值格式为 `<id>:<material>`，id 是 1-16 位字母数字、每次轮换必须唯一）：
 
@@ -205,9 +206,9 @@ openssl rand -base64 32
 npx wrangler secret put PASSWORD_PEPPER   # 填入 k1:<上面的输出>
 ```
 
-设置后，下一次成功登录会把现有口令哈希自动迁移到 v4；改密和初始化管理员也会直接产出 v4。未设置 pepper 时系统照常工作（v3、90,000 迭代），因此这是推荐项而非强制项。
+设置后，下一次成功登录会把现有口令哈希自动迁移到 v4；改密和初始化管理员也会直接产出 v4。未设置 pepper 时系统照常工作（v3、默认 25,000 迭代），因此这是推荐项而非强制项。
 
-**轮换**：生成新 id（如 `k2:<新的随机串>`）设为 `PASSWORD_PEPPER`，把旧完整值设为 `PASSWORD_PEPPER_PREVIOUS`；下一次成功登录即完成重哈希，之后可删除 `PASSWORD_PEPPER_PREVIOUS`。切勿复用 id，也不要在保留 id 的前提下更换 material。**丢失 pepper** 时对应哈希无法校验、登录失败关闭，唯一恢复途径是既有重置流程（删除 settings 表的 `password` 记录后按 `INITIAL_ADMIN_PASSWORD` 重新初始化）。详见 [`docs/password-v4-design.md`](docs/password-v4-design.md)。
+**轮换**（顺序很重要——`wrangler secret put` 会立即部署新版本，且 secret 设置后不可再读回）：先把当前完整 pepper 值存入密码管理器，再把旧完整值设为 `PASSWORD_PEPPER_PREVIOUS`，然后把新 id（如 `k2:<新的随机串>`）设为 `PASSWORD_PEPPER`；下一次成功登录即完成重哈希，之后可删除 `PASSWORD_PEPPER_PREVIOUS`。切勿复用 id，也不要在保留 id 的前提下更换 material。**丢失 pepper** 时对应哈希无法校验、登录失败关闭，唯一恢复途径是既有重置流程（删除 settings 表的 `password` 记录后按 `INITIAL_ADMIN_PASSWORD` 重新初始化）。详见 [`docs/password-v4-design.md`](docs/password-v4-design.md)。
 
 ### 目录与数据读取边界
 
