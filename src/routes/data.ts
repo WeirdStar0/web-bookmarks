@@ -76,9 +76,11 @@ export function registerDataRoutes(app: ApiApp) {
             return c.json({ bookmarks: [] });
         }
         if (query.length > MAX_SEARCH_QUERY_LENGTH) {
-            // Settle the already-started check before rejecting so no spawned
-            // read is left dangling behind the validation error.
-            await sessionCheck;
+            // Reject revoked sessions before revealing validation results, so
+            // every response path expresses the same deferred-auth semantics.
+            if (!await sessionCheck) {
+                return c.json(err(ErrCode.UNAUTHORIZED, 'Unauthorized'), 401);
+            }
             return c.json(err(ErrCode.VALIDATION, `Search query must not exceed ${MAX_SEARCH_QUERY_LENGTH} characters`), 400);
         }
 
