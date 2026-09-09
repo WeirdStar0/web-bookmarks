@@ -62,8 +62,8 @@ Click the **Deploy to Cloudflare Workers** button. It will:
 
 **What happens after deployment:**
 *   Database and indexes are initialized automatically on first visit.
-*   Set `INITIAL_ADMIN_PASSWORD` before the first production login; otherwise no default admin account is created.
-*   `SECRET_KEY` is mandatory in production: the Deploy to Cloudflare setup page prompts for it (the deploy flow reads Worker secrets declared in `.dev.vars.example`); if skipped, requests fail closed after deployment and the setup error is available in Worker logs.
+*   Set `INITIAL_ADMIN_PASSWORD` before the first production login; otherwise no default admin account is created, and first visits receive an actionable 503.
+*   `SECRET_KEY` is mandatory in production: the Deploy to Cloudflare setup page prompts for it (the deploy flow reads Worker secrets declared in `.dev.vars.example`); if skipped, requests fail closed with an actionable 503 message.
 
 ---
 

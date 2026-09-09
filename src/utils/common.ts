@@ -6,6 +6,13 @@ type SettingsRow = {
     value: string;
 };
 
+// Thrown by the init middleware when the deployment itself is not configured
+// yet (missing INITIAL_ADMIN_PASSWORD / SECRET_KEY, or a legacy default
+// password awaiting replacement). The error handler turns these into a 503
+// with actionable guidance instead of a generic 500: the message reveals only
+// deployment state, never credentials.
+export class DeploymentSetupError extends Error {}
+
 // Workers Free enforces a 10 ms CPU budget per HTTP invocation, and a
 // migration login can run two derivations (verify at the stored factor plus
 // the re-hash), so 25k is the lowest-risk default: it matches the previous

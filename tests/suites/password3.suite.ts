@@ -23,8 +23,8 @@ describe('password3', () => {
         resetInitState();
 
         const response = await app.fetch(new Request('https://example.com/'), noInitialPasswordEnv);
-        expect(response.status).toBe(500);
-        expect(await response.json()).toMatchObject({ error: 'Internal Server Error' });
+        expect(response.status).toBe(503);
+        expect(await response.json()).toMatchObject({ error: 'DEPLOYMENT_NOT_INITIALIZED' });
         expect(db.settings.get('password')).toBe(legacyHash);
     });
 });
