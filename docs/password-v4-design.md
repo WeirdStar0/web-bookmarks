@@ -44,17 +44,20 @@ variable, bounded to 25,000–100,000, defaulting to **25,000**.
 
 The Workers Free plan enforces a 10 ms CPU budget per HTTP invocation, and a
 migration login can run two derivations (verify at the stored factor plus the
-re-hash). 25,000 is therefore the only default with production evidence under
-that budget: the v1→v3 migration already ran two 25,000-iteration derivations
-per migration login. Measured workerd timings (vitest-pool-workers, reference
-dev machine) are 25k = 5 ms, 50k = 11 ms, 90k = 15 ms, 100k = 17 ms; they are
-reference data, not proof about production CPU accounting. Deployments on Paid
-plans — or that have verified their own budget — can opt into up to 100,000
-(workerd rejects derivations above 100k, cloudflare/workerd#1346, and the
-parsers reject stored hashes claiming more). Malformed or out-of-range values
-fall back to the default. Stored hashes keep their own iteration count, so
-changing the variable migrates hashes lazily on login; login remains a
-rate-limited, per-attempt cost.
+re-hash), plus the HMAC prehash. 25,000 is therefore the lowest-risk default:
+it matches the previous release's login cost, where a v1 migration performed a
+SHA-256 verification plus a single 25,000-iteration derivation. Real
+production Free-plan CPU accounting has not been benchmarked, and Cloudflare
+notes that sustained limit collisions terminate the Worker. Measured workerd
+timings (vitest-pool-workers, reference dev machine) are 25k = 5 ms,
+50k = 11 ms, 90k = 15 ms, 100k = 17 ms; they are reference data, not proof
+about production CPU accounting. Deployments on Paid plans — or that have
+verified their own budget — can opt into up to 100,000 (workerd rejects
+derivations above 100k, cloudflare/workerd#1346, and the parsers reject stored
+hashes claiming more). Malformed or out-of-range values fall back to the
+default. Stored hashes keep their own iteration count — and upgrades never
+lower a stored factor — so changing the variable migrates hashes lazily on
+login; login remains a rate-limited, per-attempt cost.
 
 ## Pepper secrets
 

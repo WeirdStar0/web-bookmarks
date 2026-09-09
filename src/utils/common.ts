@@ -8,13 +8,15 @@ type SettingsRow = {
 
 // Workers Free enforces a 10 ms CPU budget per HTTP invocation, and a
 // migration login can run two derivations (verify at the stored factor plus
-// the re-hash). 25k is therefore the default: it is the only factor with
-// production evidence under that budget (the v1→v3 migration already ran two
-// 25k derivations per migration login; measured workerd reference timings:
-// 25k=5ms, 50k=11ms, 90k=15ms, 100k=17ms). Deployments on Paid plans, or that
-// have verified their own CPU budget, can opt into up to 100k with the
-// PASSWORD_HASH_ITERATIONS variable; stored hashes keep their own iteration
-// count, so changing the variable migrates hashes lazily on login.
+// the re-hash), so 25k is the lowest-risk default: it matches the previous
+// release's login cost (a v1 migration verified with SHA-256 plus a single
+// 25k derivation). Real production Free-plan CPU accounting has not been
+// benchmarked, and sustained limit collisions terminate the Worker; measured
+// workerd reference timings: 25k=5ms, 50k=11ms, 90k=15ms, 100k=17ms.
+// Deployments on Paid plans, or that have verified their own CPU budget, can
+// opt into up to 100k with the PASSWORD_HASH_ITERATIONS variable; stored
+// hashes keep their own iteration count, so changing the variable migrates
+// hashes lazily on login.
 export const PASSWORD_HASH_DEFAULT_ITERATIONS = 25_000;
 // Production workerd rejects PBKDF2 derivations above 100k iterations
 // (cloudflare/workerd#1346), so stored hashes claiming more can never be
