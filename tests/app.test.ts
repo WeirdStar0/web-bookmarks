@@ -33,6 +33,8 @@ import './suites/reorder3.suite';
 import './suites/password.suite';
 import './suites/password2.suite';
 import './suites/password3.suite';
+import './suites/passwordv4.suite';
+import './suites/passwordmigration.suite';
 import './suites/settings.suite';
 import './suites/settings2.suite';
 import './suites/logout.suite';

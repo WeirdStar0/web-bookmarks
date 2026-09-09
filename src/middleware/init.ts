@@ -1,10 +1,14 @@
 import type { Context, Next } from 'hono';
 import { Bindings, Variables } from '../types';
 import { INIT_SQL } from '../db/schema';
-import { getSettings, hashPassword, hashPasswordV3, serializePasswordHashV3 } from '../utils/common';
+import { createPasswordHash, getSettings, hashPassword } from '../utils/common';
 
 const MIN_INITIAL_PASSWORD_LENGTH = 12;
 const LOCAL_DEVELOPMENT_PASSWORD = 'local-development-only';
+
+async function createInitialAdminPasswordHash(env: Bindings, password: string): Promise<string> {
+    return createPasswordHash(env, password);
+}
 
 let instanceSecret: string | null = null;
 let dbReady = false;
@@ -42,10 +46,6 @@ async function ensureDatabaseReady(db: D1Database): Promise<void> {
     }
 
     await dbInitializationPromise;
-}
-
-async function createPasswordHash(password: string): Promise<string> {
-    return serializePasswordHashV3(await hashPasswordV3(password));
 }
 
 export async function initMiddleware(c: Context<{ Bindings: Bindings; Variables: Variables }>, next: Next) {
@@ -113,7 +113,7 @@ export async function initMiddleware(c: Context<{ Bindings: Bindings; Variables:
                     throw new Error(`Initial admin password must be at least ${MIN_INITIAL_PASSWORD_LENGTH} characters`);
                 }
 
-                const initialAdminPasswordValue = await createPasswordHash(initialAdminPassword);
+                const initialAdminPasswordValue = await createInitialAdminPasswordHash(c.env, initialAdminPassword);
                 try {
                     await c.env.DB.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').bind('username', 'admin').run();
                     await c.env.DB.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)').bind('password', initialAdminPasswordValue).run();
@@ -139,7 +139,7 @@ export async function initMiddleware(c: Context<{ Bindings: Bindings; Variables:
                 if (initialAdminPassword.length < MIN_INITIAL_PASSWORD_LENGTH) {
                     throw new Error(`Legacy default administrator password requires INITIAL_ADMIN_PASSWORD with at least ${MIN_INITIAL_PASSWORD_LENGTH} characters`);
                 }
-                const migratedHash = await createPasswordHash(initialAdminPassword);
+                const migratedHash = await createInitialAdminPasswordHash(c.env, initialAdminPassword);
                 await c.env.DB.prepare('UPDATE settings SET value = ? WHERE key = ?').bind(migratedHash, 'password').run();
                 console.warn('Legacy default administrator password replaced with INITIAL_ADMIN_PASSWORD. Change it after first login.');
             }

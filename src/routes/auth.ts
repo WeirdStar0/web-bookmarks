@@ -1,15 +1,13 @@
 import { deleteCookie, setSignedCookie } from 'hono/cookie';
 import type { Context } from 'hono';
 import {
+    createPasswordHash,
     getConfig,
     getSessionVersion,
     getSettings,
-    hashPassword,
-    hashPasswordV2,
-    hashPasswordV3,
-    parsePasswordHashV3,
-    serializePasswordHashV3,
     rotateSessionVersion,
+    upgradeStoredPasswordIfUnchanged,
+    verifyStoredPassword,
     err,
     ErrCode,
 } from '../utils/common';
@@ -47,24 +45,12 @@ async function setAuthCookie(
     return true;
 }
 
-async function createInitialPasswordV3(db: D1Database, password: string): Promise<boolean> {
-    const value = serializePasswordHashV3(await hashPasswordV3(password));
+async function createInitialPassword(env: Bindings, db: D1Database, password: string): Promise<boolean> {
+    const value = await createPasswordHash(env, password);
     const inserted = await db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)')
         .bind('password', value)
         .run();
     return Number(inserted.meta.changes) === 1;
-}
-
-async function upgradePasswordV3IfUnchanged(
-    db: D1Database,
-    expectedStoredValue: string,
-    password: string,
-): Promise<boolean> {
-    const value = serializePasswordHashV3(await hashPasswordV3(password));
-    const updated = await db.prepare('UPDATE settings SET value = ? WHERE key = ? AND value = ?')
-        .bind(value, 'password', expectedStoredValue)
-        .run();
-    return Number(updated.meta.changes) === 1;
 }
 
 export function registerAuthRoutes(app: ApiApp) {
@@ -96,7 +82,7 @@ export function registerAuthRoutes(app: ApiApp) {
             }
 
             if (username === dbUser && password === initialAdminPassword) {
-                if (await createInitialPasswordV3(c.env.DB, initialAdminPassword)
+                if (await createInitialPassword(c.env, c.env.DB, initialAdminPassword)
                     && await setAuthCookie(c, config.sessionMaxAge, sessionVersionAtVerificationStart, config.allowedExtensionOrigins)) {
                     return c.json({ success: true });
                 }
@@ -106,38 +92,26 @@ export function registerAuthRoutes(app: ApiApp) {
         }
 
         if (username === dbUser) {
-            if (dbPass.startsWith('v3:')) {
-                const parsed = parsePasswordHashV3(dbPass);
-                if (parsed) {
-                    const verify = await hashPasswordV3(password, parsed.iterations, parsed.salt);
-                    if (verify.hash === parsed.hash) {
-                        if (await setAuthCookie(c, config.sessionMaxAge, sessionVersionAtVerificationStart, config.allowedExtensionOrigins)) {
-                            return c.json({ success: true });
-                        }
+            const verdict = await verifyStoredPassword(c.env, dbPass, password);
+            if (verdict.ok) {
+                // Legacy v1/v2 hashes rely on the conditional upgrade write to
+                // detect a credential change racing this login, so a lost race
+                // aborts them. v3/v4 keep their session in that race because a
+                // real credential change also rotates the session version and
+                // setAuthCookie re-checks it below.
+                const isLegacyFormat = !dbPass.startsWith('v3:') && !dbPass.startsWith('v4:');
+                let migrated = false;
+                if (verdict.needsUpgrade) {
+                    const outcome = await upgradeStoredPasswordIfUnchanged(c.env, c.env.DB, dbPass, password);
+                    if (outcome === 'applied') migrated = true;
+                    if (outcome === 'unchanged' && isLegacyFormat) {
                         return c.json(err(ErrCode.INVALID_CREDENTIALS, 'Invalid credentials'), 401);
                     }
                 }
-            } else if (dbPass.startsWith('v2:')) {
-                const parts = dbPass.split(':');
-                if (parts.length === 3) {
-                    const verify = await hashPasswordV2(password, parts[1]);
-                    if (verify.hash === parts[2]) {
-                        if (await upgradePasswordV3IfUnchanged(c.env.DB, dbPass, password)
-                            && await setAuthCookie(c, config.sessionMaxAge, sessionVersionAtVerificationStart, config.allowedExtensionOrigins)) {
-                            return c.json({ success: true, migrated: true });
-                        }
-                        return c.json(err(ErrCode.INVALID_CREDENTIALS, 'Invalid credentials'), 401);
-                    }
+                if (await setAuthCookie(c, config.sessionMaxAge, sessionVersionAtVerificationStart, config.allowedExtensionOrigins)) {
+                    return c.json({ success: true, ...(migrated ? { migrated: true } : {}) });
                 }
-            } else {
-                const inputHash = await hashPassword(password);
-                if (inputHash === dbPass) {
-                    if (await upgradePasswordV3IfUnchanged(c.env.DB, dbPass, password)
-                        && await setAuthCookie(c, config.sessionMaxAge, sessionVersionAtVerificationStart, config.allowedExtensionOrigins)) {
-                        return c.json({ success: true, migrated: true });
-                    }
-                    return c.json(err(ErrCode.INVALID_CREDENTIALS, 'Invalid credentials'), 401);
-                }
+                return c.json(err(ErrCode.INVALID_CREDENTIALS, 'Invalid credentials'), 401);
             }
         }
         return c.json(err(ErrCode.INVALID_CREDENTIALS, 'Invalid credentials'), 401);
@@ -166,7 +140,7 @@ export function registerAuthRoutes(app: ApiApp) {
             // storage failure cannot leave a changed username/password paired
             // with an unrevoked old session.
             const passwordHash = password
-                ? serializePasswordHashV3(await hashPasswordV3(password))
+                ? await createPasswordHash(c.env, password)
                 : null;
             const nextSessionVersion = crypto.randomUUID();
             const statements = [];
