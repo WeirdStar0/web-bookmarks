@@ -45,3 +45,4 @@ temp/
 # AI Assistant
 .agent/
 .claude/settings.local.json
+.workbuddy/
