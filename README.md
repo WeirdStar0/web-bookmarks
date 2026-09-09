@@ -65,7 +65,7 @@
 **部署后的结果：**
 *   数据库和索引会在首次访问时自动初始化。
 *   首次生产登录前必须设置 `INITIAL_ADMIN_PASSWORD`，否则不会创建默认管理员账号。
-*   生产环境强制要求 `SECRET_KEY`：一键部署完成后，请在 Worker 的设置中添加 `SECRET_KEY`（Settings → Variables → Secrets），缺失时请求会失败并提示设置方法。
+*   生产环境强制要求 `SECRET_KEY`：Deploy to Cloudflare 配置页面会提示填写（部署流程会识别 `.dev.vars.example` 中声明的 Worker secrets）；如果跳过，Worker 部署后会 fail closed，具体错误信息可在 Worker 日志中查看。
 
 ---
 
