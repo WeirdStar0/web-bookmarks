@@ -42,24 +42,32 @@ with raw Web Crypto calls to pin the construction.
 Fresh hashes use `resolvePasswordIterations(env)`: the `PASSWORD_HASH_ITERATIONS`
 variable, bounded to 25,000–100,000, defaulting to **25,000**.
 
-The Workers Free plan enforces a 10 ms CPU budget per HTTP invocation, and a
-migration login can run two derivations (verify at the stored factor plus the
-re-hash), plus the HMAC prehash. **Production benchmark (2026-09-09, this
-deployment's Free plan, workers.dev; external wall-clock over in-request
-×1/×10/×20 loops, median-based slopes):** a single derivation measured
-≈ 6–8 ms at 25k, ≈ 13–28 ms at 90k, and ≈ 17–35 ms at 100k; a default-factor
-migration login (25k verify + 25k re-hash) ≈ 15 ms; a 90k v4 migration ≈ 19 ms;
-a v2 migration (100k verify + 100k re-hash) ≈ 45 ms. None of the ~50 requests —
-including multi-hundred-millisecond compute bursts — was CPU-terminated,
-consistent with the limit being enforced as an average with burst headroom
-rather than a hard per-request kill. The margin at higher factors is still
-thin and varies by colo, so the default remains 25,000 (the lowest-risk
-value), with up to 100,000 available as an opt-in (workerd rejects derivations
-above 100k, cloudflare/workerd#1346, and the parsers reject stored hashes
-claiming more). Malformed or out-of-range values fall back to the default.
-Stored hashes keep their own iteration count — and upgrades never lower a
-stored factor — so changing the variable migrates hashes lazily on login;
-login remains a rate-limited, per-attempt cost.
+Free has a 10 ms CPU limit per HTTP invocation; isolates have built-in
+flexibility for infrequent overruns, while consistent limit hits are
+terminated. A migration login can run two derivations (verify at the stored
+factor plus the re-hash), plus the HMAC prehash. **Production benchmark
+(2026-09-09, this deployment's Free plan, workers.dev; per-invocation
+`cpuTimeMs` from Workers Invocation Logs via `wrangler tail`, 30 requests per
+scenario, median [p95]; harness: `scripts/kdf_bench/`):** a single 25k
+derivation costs 6.0 [7.0] ms CPU — already 60% of the nominal budget — 90k
+costs 20.5 [26.0] ms and 100k costs 21.5 [27.0] ms; a default-factor
+migration login (25k verify + 25k v4 re-hash) 13.0 [16.0] ms; a 90k v4
+migration (25k verify + 90k re-hash) 27.5 [36.0] ms; a v2 migration (100k
+verify + 100k re-hash) 55.5 [91.0] ms. Client-side wall-clock medians for the
+same requests were ≈ 190–250 ms, dominated by network latency; they are kept
+only as a real-request-latency reference and supersede the earlier
+external-wall-clock loop-slope estimates taken the same day. No invocation
+was CPU-terminated during collection — including the 55–91 ms migration
+bursts — which is consistent with the documented flexibility for infrequent
+overruns; it is not evidence that 10 ms is a soft average, and consistent
+limit hits are still terminated. Because even the 25k default puts a
+migration login at ≈ 13 ms, the default remains 25,000 (the lowest-risk
+value), with up to 100,000 available as an opt-in (workerd rejects
+derivations above 100k, cloudflare/workerd#1346, and the parsers reject
+stored hashes claiming more). Malformed or out-of-range values fall back to
+the default. Stored hashes keep their own iteration count — and upgrades
+never lower a stored factor — so changing the variable migrates hashes
+lazily on login; login remains a rate-limited, per-attempt cost.
 
 ## Pepper secrets
 

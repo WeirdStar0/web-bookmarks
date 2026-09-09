@@ -6,18 +6,19 @@ type SettingsRow = {
     value: string;
 };
 
-// Workers Free enforces a 10 ms CPU budget per HTTP invocation (as an
-// average, with burst headroom), and a migration login can run two
-// derivations (verify at the stored factor plus the re-hash), plus the HMAC
-// prehash. Production benchmark on this account's Free plan (2026-09-09,
-// external wall-clock over in-request loops): ~6-8 ms per 25k derivation,
-// ~13-28 ms per 90k, ~17-35 ms per 100k; a default-factor migration login
-// ~15 ms, a 90k v4 migration ~19 ms, a v2 (100k+100k) migration ~45 ms - all
-// completed without CPU termination. 25k stays the lowest-risk default; up to
-// 100k is available via the PASSWORD_HASH_ITERATIONS variable (workerd
-// rejects derivations above 100k, cloudflare/workerd#1346); stored hashes
-// keep their own iteration count, so changing the variable migrates hashes
-// lazily on login.
+// Workers Free has a 10 ms CPU limit per HTTP invocation; isolates have
+// built-in flexibility for infrequent overruns, while consistent limit hits
+// are terminated. A migration login can run two derivations (verify at the
+// stored factor plus the re-hash), plus the HMAC prehash. Production
+// benchmark on this account's Free plan (2026-09-09, per-invocation
+// cpuTimeMs from Workers Invocation Logs; harness: scripts/kdf_bench/):
+// 25k derivation = 6 ms CPU, 90k = 21 ms, 100k = 22 ms; a default-factor
+// migration login (25k+25k) = 13 ms, a 90k v4 migration = 28 ms, a v2
+// (100k+100k) migration = 56 ms - none CPU-terminated during collection.
+// 25k stays the lowest-risk default; up to 100k is available via the
+// PASSWORD_HASH_ITERATIONS variable (workerd rejects derivations above
+// 100k, cloudflare/workerd#1346); stored hashes keep their own iteration
+// count, so changing the variable migrates hashes lazily on login.
 export const PASSWORD_HASH_DEFAULT_ITERATIONS = 25_000;
 // Production workerd rejects PBKDF2 derivations above 100k iterations
 // (cloudflare/workerd#1346), so stored hashes claiming more can never be
