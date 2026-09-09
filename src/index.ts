@@ -22,7 +22,7 @@ import { pt } from './locales/pt';
 import { it } from './locales/it';
 import { csrf } from 'hono/csrf';
 import type { HTTPException } from 'hono/http-exception';
-import { err, ErrCode, getConfig } from './utils/common';
+import { err, ErrCode, getConfig, DeploymentSetupError } from './utils/common';
 import type { TemplateTranslations } from './templates/types';
 import { appAssetSource } from './templates/appAsset';
 import { appCssAssetSource } from './templates/appCssAsset';
@@ -106,6 +106,16 @@ app.use('*', secureHeaders({
 
 // Global Error Handler
 app.onError((err, c) => {
+    // First-run guidance: the deployment itself is not configured yet. The
+    // message reveals only deployment state, never credentials, and 503 marks
+    // a temporary operator-fixable condition instead of a bug.
+    if (err instanceof DeploymentSetupError) {
+        return c.json({
+            error: 'DEPLOYMENT_NOT_INITIALIZED',
+            message: err.message,
+        }, 503);
+    }
+
     // Hono surfaces malformed request JSON as a SyntaxError. Treat it as a
     // client validation failure rather than reporting a misleading 500.
     const isMalformedJson = err instanceof SyntaxError || err.name === 'SyntaxError';

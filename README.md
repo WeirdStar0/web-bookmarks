@@ -64,8 +64,8 @@
 
 **部署后的结果：**
 *   数据库和索引会在首次访问时自动初始化。
-*   首次生产登录前必须设置 `INITIAL_ADMIN_PASSWORD`，否则不会创建默认管理员账号。
-*   生产环境强制要求 `SECRET_KEY`：Deploy to Cloudflare 配置页面会提示填写（部署流程会识别 `.dev.vars.example` 中声明的 Worker secrets）；如果跳过，Worker 部署后会 fail closed，具体错误信息可在 Worker 日志中查看。
+*   首次生产登录前必须设置 `INITIAL_ADMIN_PASSWORD`，否则不会创建默认管理员账号；未初始化时首次访问会返回 503 与设置指引。
+*   生产环境强制要求 `SECRET_KEY`：Deploy to Cloudflare 配置页面会提示填写（部署流程会识别 `.dev.vars.example` 中声明的 Worker secrets）；如果跳过，请求会失败关闭并直接返回设置指引（HTTP 503），详细原因同时记录在 Worker 日志中。
 
 ---
 
