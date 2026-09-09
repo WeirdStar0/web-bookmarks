@@ -99,7 +99,13 @@ what keeps every stored hash verifiable at every moment:
    `PREVIOUS`; nothing is disrupted.
 3. `npx wrangler secret put PASSWORD_PEPPER` → the **new** full value (`k2:...`).
 4. Log in once. The successful login re-hashes the stored hash to `k2`.
-5. After that login, `PASSWORD_PEPPER_PREVIOUS` can be removed.
+5. Confirm the re-hash actually landed — the migration write fails silently by
+   design, and removing `PREVIOUS` before the new id is stored would lock the
+   account. Query only the pepper id, never the hash:
+   `SELECT CASE WHEN value LIKE 'v4:k2:%' THEN 'migrated' ELSE 'not-migrated'
+   END AS state FROM settings WHERE key = 'password';` Retry the login until
+   it reports `migrated`.
+6. Remove `PASSWORD_PEPPER_PREVIOUS`.
 
 Setting `PASSWORD_PEPPER` first (the intuitive order) would leave stored
 `v4:k1` hashes with no resolvable pepper between the two commands, rejecting

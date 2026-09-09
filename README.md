@@ -208,7 +208,7 @@ npx wrangler secret put PASSWORD_PEPPER   # 填入 k1:<上面的输出>
 
 设置后，下一次成功登录会把现有口令哈希自动迁移到 v4；改密和初始化管理员也会直接产出 v4。未设置 pepper 时系统照常工作（v3、默认 25,000 迭代），因此这是推荐项而非强制项。
 
-**轮换**（顺序很重要——`wrangler secret put` 会立即部署新版本，且 secret 设置后不可再读回）：先把当前完整 pepper 值存入密码管理器，再把旧完整值设为 `PASSWORD_PEPPER_PREVIOUS`，然后把新 id（如 `k2:<新的随机串>`）设为 `PASSWORD_PEPPER`；下一次成功登录即完成重哈希，之后可删除 `PASSWORD_PEPPER_PREVIOUS`。切勿复用 id，也不要在保留 id 的前提下更换 material。**丢失 pepper** 时对应哈希无法校验、登录失败关闭，唯一恢复途径是既有重置流程（删除 settings 表的 `password` 记录后按 `INITIAL_ADMIN_PASSWORD` 重新初始化）。详见 [`docs/password-v4-design.md`](docs/password-v4-design.md)。
+**轮换**（顺序很重要——`wrangler secret put` 会立即部署新版本，且 secret 设置后不可再读回）：先把当前完整 pepper 值存入密码管理器，再把旧完整值设为 `PASSWORD_PEPPER_PREVIOUS`，然后把新 id（如 `k2:<新的随机串>`）设为 `PASSWORD_PEPPER`；下一次成功登录触发重哈希。删除 `PASSWORD_PEPPER_PREVIOUS` 前，先确认迁移确实落库（迁移写入可能静默失败）：只查询 `settings.password` 是否已引用新 id（布尔查询见 runbook），确认后再删除。切勿复用 id，也不要在保留 id 的前提下更换 material。**丢失 pepper** 时对应哈希无法校验、登录失败关闭，唯一恢复途径是既有重置流程（删除 settings 表的 `password` 记录后按 `INITIAL_ADMIN_PASSWORD` 重新初始化）。详见 [`docs/password-v4-design.md`](docs/password-v4-design.md)。
 
 ### 目录与数据读取边界
 
