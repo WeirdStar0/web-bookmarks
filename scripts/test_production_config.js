@@ -35,6 +35,23 @@ preview_id = "preview-namespace-id"
     assert.equal(productionId.status, 0, 'a production KV id must satisfy deployment gate');
     assert.match(productionId.stdout, /passed/i);
 
+    // The pre-deploy gate must stay local-only: a first deployment must not
+    // be blocked by a remote database that has not been created or migrated
+    // yet. Remote ledger verification is a separate, explicit command that
+    // runs after `db:migrate:remote` and after deployment.
+    const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+    assert.match(packageJson.scripts['deploy:check'], /check:migrations/, 'deploy:check must validate the local migration file set');
+    assert.doesNotMatch(packageJson.scripts['deploy:check'], /check_remote_d1_migrations/, 'deploy:check must not require remote D1 migrations before first deploy');
+    assert.match(packageJson.scripts['verify:remote-migrations'], /check_remote_d1_migrations/, 'verify:remote-migrations must run the remote ledger check');
+
+    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    const deployCheck = spawnSync(npmCommand, ['run', 'deploy:check'], {
+        cwd: rootDir,
+        encoding: 'utf8',
+        shell: process.platform === 'win32',
+    });
+    assert.equal(deployCheck.status, 0, `deploy:check must pass without touching remote D1 (error: ${deployCheck.error} stdout: ${deployCheck.stdout} stderr: ${deployCheck.stderr})`);
+
     console.log('Production configuration gate checks passed.');
 } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });

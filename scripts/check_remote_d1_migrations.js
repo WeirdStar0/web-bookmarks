@@ -1,3 +1,10 @@
+// Post-migration verification that the remote D1 ledger contains exactly the
+// migrations in ./migrations. Deliberately NOT part of `deploy:check`: a
+// first deployment must not be blocked by asking a database that may not
+// exist yet to prove it has already been migrated. Apply migrations first
+// (`npm run db:migrate:remote`), then confirm with
+// `npm run verify:remote-migrations`.
+
 const fs = require('fs');
 const path = require('path');
 const { execFileSync, execSync } = require('child_process');

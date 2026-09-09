@@ -30,7 +30,7 @@ For a brand-new database, create the database, put its real ID in `wrangler.toml
 npx wrangler d1 create bookmarks-db
 npm run check:migrations
 npm run db:migrate:remote
-npm run deploy:check
+npm run verify:remote-migrations
 ```
 
 Do not run `schema.sql` and `db:migrate:remote` against the same new database unless you intentionally choose one initialization path and verify the resulting `d1_migrations` ledger.
@@ -56,7 +56,7 @@ After the schema is reconciled, apply only the remaining migrations and verify t
 
 ```bash
 npm run db:migrate:remote
-npm run deploy:check
+npm run verify:remote-migrations
 ```
 
 If a Wrangler migration command reports an SQL parser error for a trigger migration, stop and inspect `d1_migrations` and `sqlite_master` before retrying. A failed migration can leave earlier migrations applied. Do not repeat the entire chain automatically.
@@ -84,7 +84,10 @@ npx wrangler secret put INITIAL_ADMIN_PASSWORD
 npm run check
 npm run deploy:check
 npx wrangler deploy
+npm run verify:remote-migrations
 ```
+
+`deploy:check` is intentionally local-only (migration files and production bindings). The remote ledger is verified after migration and after deployment with `verify:remote-migrations`, so a first deployment is never blocked by a database that has not been migrated yet.
 
 After deployment, verify the public login page and an unauthenticated API response without submitting credentials:
 
