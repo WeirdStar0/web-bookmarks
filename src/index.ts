@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { logger } from 'hono/logger';
 import { cors } from 'hono/cors';
 import { secureHeaders } from 'hono/secure-headers';
 import { getCookie } from 'hono/cookie';
@@ -23,6 +22,7 @@ import { it } from './locales/it';
 import { csrf } from 'hono/csrf';
 import type { HTTPException } from 'hono/http-exception';
 import { err, ErrCode, getConfig, DeploymentSetupError } from './utils/common';
+import { apiRequestLogMiddleware, logRequestError } from './utils/observability';
 import type { TemplateTranslations } from './templates/types';
 import { appAssetSource } from './templates/appAsset';
 import { appCssAssetSource } from './templates/appCssAsset';
@@ -57,7 +57,9 @@ function isAllowedRequestOrigin(origin: string, requestOrigin: string, allowedEx
     return false;
 }
 
-app.use('*', logger());
+// Persist one structured log for API responses. This intentionally records
+// pathname only: search terms and other query parameters must not reach logs.
+app.use('/api/*', apiRequestLogMiddleware);
 app.use('*', csrf({
     origin: (origin, c) => {
         const config = getConfig(c.env);
@@ -108,13 +110,22 @@ app.use('*', secureHeaders({
 
 // Global Error Handler
 app.onError((err, c) => {
+    const request = {
+        method: c.req.method,
+        url: c.req.url,
+        ray: c.req.header('CF-Ray'),
+    };
+
     // First-run guidance: the deployment itself is not configured yet. The
     // message reveals only deployment state, never credentials, and 503 marks
     // a temporary operator-fixable condition instead of a bug.
     if (err instanceof DeploymentSetupError) {
         // The missing-SECRET_KEY case is thrown outside the init settings
         // try/catch, so this branch is the only place it reaches a log.
-        console.warn(`[Deployment Setup]: ${err.message}`);
+        logRequestError('warn', 'deployment.setup_error', request, {
+            status: 503,
+            message: err.message,
+        });
         return c.json({
             error: 'DEPLOYMENT_NOT_INITIALIZED',
             message: err.message,
@@ -126,9 +137,18 @@ app.onError((err, c) => {
     const isMalformedJson = err instanceof SyntaxError || err.name === 'SyntaxError';
     const status = isMalformedJson ? 400 : (err as HTTPException).status || 500;
     if (status >= 500) {
-        console.error(`[Global Error]: ${err.stack || err.message}`);
+        logRequestError('error', 'request.error', request, {
+            status,
+            error_name: err.name,
+            message: err.message,
+            stack: err.stack,
+        });
     } else {
-        console.warn(`[Request Rejected ${status}]: ${err.message}`);
+        logRequestError('warn', 'request.rejected', request, {
+            status,
+            error_name: err.name,
+            message: err.message,
+        });
     }
     const acceptLanguage = c.req.header('Accept-Language') || '';
     let isEn = acceptLanguage.toLowerCase().startsWith('en');
