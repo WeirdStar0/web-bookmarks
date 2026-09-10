@@ -45,6 +45,9 @@ jobs:
     needs: quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      PLAYWRIGHT_RUNNER_DIR: ${{ runner.temp }}/playwright-runner
+      NODE_PATH: ${{ runner.temp }}/playwright-runner/node_modules
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -58,14 +61,14 @@ jobs:
       - name: Install project dependencies
         run: npm ci
 
-      - name: Install pinned Playwright runner
-        run: npm install --no-save --package-lock=false --legacy-peer-deps @playwright/test@1.63.0
+      - name: Install pinned Playwright runner in isolation
+        run: npm install --prefix "$PLAYWRIGHT_RUNNER_DIR" --no-save --package-lock=false @playwright/test@1.63.0
 
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        run: "$PLAYWRIGHT_RUNNER_DIR/node_modules/.bin/playwright" install --with-deps chromium
 
       - name: Run browser smoke test
-        run: npx playwright test --config=playwright.config.cjs
+        run: "$PLAYWRIGHT_RUNNER_DIR/node_modules/.bin/playwright" test --config=playwright.config.cjs
 
   production-config:
     name: Verify production deployment configuration
