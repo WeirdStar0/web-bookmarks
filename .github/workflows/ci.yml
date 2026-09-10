@@ -59,17 +59,10 @@ jobs:
         run: npm ci
 
       - name: Install pinned Playwright runner
-        run: npm install --no-save --package-lock=false @playwright/test@1.63.0
+        run: npm install --no-save --package-lock=false --legacy-peer-deps @playwright/test@1.63.0
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-
-      - name: Prepare local E2E secrets
-        run: |
-          cat > .dev.vars <<'EOF'
-          SECRET_KEY=ci-e2e-session-secret-0123456789abcdef
-          INITIAL_ADMIN_PASSWORD=ci-e2e-password-123
-          EOF
 
       - name: Run browser smoke test
         run: npx playwright test --config=playwright.config.cjs
