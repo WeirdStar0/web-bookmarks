@@ -1,23 +1,22 @@
 name = "web-bookmarks"
-compatibility_date = "2025-11-21"
+compatibility_date = "2026-09-10"
 main = "src/index.ts"
 
 [observability]
 enabled = true
-# Search terms and other query parameters should not be persisted in request URLs.
-redact_query_string = true
 
 [observability.logs]
 enabled = true
-invocation_logs = true
-# Keep logs at 100% for this low-volume personal service so rare failures remain visible.
+# The repository currently locks Wrangler 4.56.0, which does not understand
+# observability.redact_query_string. Keep invocation logs off so search query
+# strings cannot be persisted in request URLs. Custom console logs remain on.
+invocation_logs = false
 head_sampling_rate = 1
 
 [observability.traces]
-enabled = true
-# Traces are much higher-cardinality than logs. Sample 1% by default; raise only
-# for a short diagnostic window when needed.
-head_sampling_rate = 0.01
+# Traces can also contain request URLs. Re-enable only after Wrangler is upgraded
+# to a release that accepts observability.redact_query_string and CI confirms it.
+enabled = false
 
 # 环境变量 - 在 Cloudflare Dashboard 中配置这些变量
 # SECRET_KEY 是生产环境强制项（非 localhost 部署缺少它时请求会失败关闭）：
