@@ -16,6 +16,8 @@ test('critical browser journey works without Alpine or CSP errors', async ({ pag
     page.on('console', (message) => {
         if (message.type() !== 'error') return;
         const text = message.text();
+        // Chrome logs the expected unauthenticated auth probe as a resource error.
+        // Ignore only that exact 401 before login; the same error after login still fails the smoke test.
         if (!signedIn && text === EXPECTED_PRELOGIN_401) return;
         consoleErrors.push(text);
     });
