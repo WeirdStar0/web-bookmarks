@@ -3,6 +3,7 @@ import type { ApiApp } from './types';
 import { BOOKMARK_PUBLIC_COLUMNS, FOLDER_PUBLIC_COLUMNS } from './columns';
 import { idSchema } from '../utils/schemas';
 import { err, ErrCode, getSessionVersion } from '../utils/common';
+import { logD1RouteSummary } from '../utils/observability';
 import type { Bindings, Variables } from '../types';
 
 const MAX_SEARCH_QUERY_LENGTH = 200;
@@ -36,7 +37,8 @@ export function registerDataRoutes(app: ApiApp) {
 
         const sessionCheck = hasValidHotReadSession(c);
         const foldersPromise = c.env.DB.prepare(`SELECT ${FOLDER_PUBLIC_COLUMNS} FROM folders WHERE is_deleted = 0 ORDER BY sort_order ASC, name ASC`).all();
-        const [sessionValid, { results: folders }] = await Promise.all([sessionCheck, foldersPromise]);
+        const [sessionValid, foldersResult] = await Promise.all([sessionCheck, foldersPromise]);
+        const folders = foldersResult.results;
         if (!sessionValid) {
             return c.json(err(ErrCode.UNAUTHORIZED, 'Unauthorized'), 401);
         }
@@ -44,6 +46,7 @@ export function registerDataRoutes(app: ApiApp) {
             return c.json(err(ErrCode.NOT_FOUND, 'Folder not found'), 404);
         }
         if (!includeBookmarks) {
+            logD1RouteSummary('/api/data', [foldersResult], folders.length, 'folders_only');
             return c.json({ folders, bookmarks: [], bookmarkCounts: {} });
         }
 
@@ -54,13 +57,22 @@ export function registerDataRoutes(app: ApiApp) {
             'SELECT folder_id, COUNT(*) AS count FROM bookmarks WHERE is_deleted = 0 AND folder_id IS NOT NULL GROUP BY folder_id'
         ).all<{ folder_id: number; count: number }>();
 
-        const [
-            { results: bookmarks },
-            { results: countRows },
-        ] = await Promise.all([bookmarksPromise, bookmarkCountsPromise]);
+        const [bookmarksResult, bookmarkCountsResult] = await Promise.all([
+            bookmarksPromise,
+            bookmarkCountsPromise,
+        ]);
+        const bookmarks = bookmarksResult.results;
+        const countRows = bookmarkCountsResult.results;
 
         const bookmarkCounts: Record<string, number> = {};
         for (const row of countRows) bookmarkCounts[String(row.folder_id)] = Number(row.count);
+
+        logD1RouteSummary(
+            '/api/data',
+            [foldersResult, bookmarksResult, bookmarkCountsResult],
+            folders.length + bookmarks.length + countRows.length,
+            folderId === null ? 'root' : 'folder',
+        );
         return c.json({ folders, bookmarks, bookmarkCounts });
     });
 
@@ -94,7 +106,7 @@ export function registerDataRoutes(app: ApiApp) {
         const bookmarksPromise = c.env.DB.prepare(
             `SELECT ${BOOKMARK_PUBLIC_COLUMNS} FROM bookmarks WHERE is_deleted = 0 AND (title LIKE ? ESCAPE '\\' OR url LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\') ORDER BY sort_order ASC, created_at DESC LIMIT 50`,
         ).bind(pattern, pattern, pattern).all();
-        const [sessionValid, { results: folders }, { results: bookmarks }] = await Promise.all([
+        const [sessionValid, foldersResult, bookmarksResult] = await Promise.all([
             sessionCheck,
             foldersPromise,
             bookmarksPromise,
@@ -103,6 +115,13 @@ export function registerDataRoutes(app: ApiApp) {
             return c.json(err(ErrCode.UNAUTHORIZED, 'Unauthorized'), 401);
         }
 
+        const folders = foldersResult.results;
+        const bookmarks = bookmarksResult.results;
+        logD1RouteSummary(
+            '/api/search',
+            [foldersResult, bookmarksResult],
+            folders.length + bookmarks.length,
+        );
         return c.json({ folders, bookmarks });
     });
 }
