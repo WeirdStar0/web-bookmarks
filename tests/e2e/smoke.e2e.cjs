@@ -7,6 +7,8 @@ function alpineClick(page, expression) {
     return page.locator(`button[\\@click="${expression}"]`).first();
 }
 
+// This smoke test mutates the local D1 database, so CI intentionally runs it once
+// against the fresh per-job Wrangler local state instead of retrying in place.
 test('critical browser journey works without Alpine or CSP errors', async ({ page }) => {
     const pageErrors = [];
     const consoleErrors = [];
