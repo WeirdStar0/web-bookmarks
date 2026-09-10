@@ -4,7 +4,6 @@ init() {
 
     this.$watch('currentFolderId', value => {
         localStorage.setItem('currentFolderId', JSON.stringify(value));
-        this._sidebarDirty = true;
         if (this.loggedIn && this.currentView === 'home' && !this.searchQuery) {
             void this.loadData();
         }
@@ -115,7 +114,6 @@ async loadData(options = {}) {
         this.bookmarkCounts = data.bookmarkCounts && typeof data.bookmarkCounts === 'object' ? data.bookmarkCounts : {};
         this.searchResults = null;
         this.calculateFolderCounts();
-        this._sidebarDirty = true;
         this._loadedFolderId = folderId;
         return true;
     } catch (error) {
