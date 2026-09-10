@@ -59,15 +59,15 @@ jobs:
         run: npm ci
 
       - name: Install pinned Playwright runner in isolation
-        run: npm install --prefix "$RUNNER_TEMP/playwright-runner" --no-save --package-lock=false @playwright/test@1.63.0
+        run: npm install --prefix /tmp/playwright-runner --no-save --package-lock=false @playwright/test@1.63.0
 
       - name: Install Chromium
-        run: "$RUNNER_TEMP/playwright-runner/node_modules/.bin/playwright" install --with-deps chromium
+        run: /tmp/playwright-runner/node_modules/.bin/playwright install --with-deps chromium
 
       - name: Run browser smoke test
         env:
-          NODE_PATH: ${{ runner.temp }}/playwright-runner/node_modules
-        run: "$RUNNER_TEMP/playwright-runner/node_modules/.bin/playwright" test --config=playwright.config.cjs
+          NODE_PATH: /tmp/playwright-runner/node_modules
+        run: /tmp/playwright-runner/node_modules/.bin/playwright test --config=playwright.config.cjs
 
   production-config:
     name: Verify production deployment configuration
