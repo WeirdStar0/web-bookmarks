@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { logD1RouteSummary, summarizeD1Results } from '../../src/utils/observability';
+import { logD1RouteSummary, logRequestError, summarizeD1Results } from '../../src/utils/observability';
 
 describe('observability helpers', () => {
     it('aggregates only D1 metadata that is actually measurable', () => {
@@ -62,6 +62,35 @@ describe('observability helpers', () => {
             expect(JSON.stringify(payload)).not.toContain('bookmark title');
         } finally {
             log.mockRestore();
+        }
+    });
+
+    it('strips query strings from structured error logs', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        try {
+            logRequestError('warn', 'request.rejected', {
+                method: 'GET',
+                url: 'https://example.com/api/search?q=private-search-term&folderId=42',
+                ray: 'ray-123',
+            }, {
+                status: 400,
+                message: 'Rejected',
+            });
+
+            expect(warn).toHaveBeenCalledTimes(1);
+            const payload = warn.mock.calls[0][0];
+            expect(payload).toEqual({
+                event: 'request.rejected',
+                method: 'GET',
+                path: '/api/search',
+                cf_ray: 'ray-123',
+                status: 400,
+                message: 'Rejected',
+            });
+            expect(JSON.stringify(payload)).not.toContain('private-search-term');
+            expect(JSON.stringify(payload)).not.toContain('folderId');
+        } finally {
+            warn.mockRestore();
         }
     });
 });
