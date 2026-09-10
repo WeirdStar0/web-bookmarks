@@ -129,3 +129,98 @@ git status --short
 ```
 
 The working tree should be clean after the release commit, except for intentionally ignored local files such as `.dev.vars` and local database files.
+
+## 7. D1 Time Travel incident recovery
+
+Cloudflare D1 Time Travel is point-in-time recovery for databases on the production storage backend. It is always enabled; there is no backup switch to turn on. The retention window is plan-dependent: **7 days on Workers Free and 30 days on Workers Paid**. Time Travel is for short-horizon operational recovery; keep independent SQL exports when you need retention beyond that window.
+
+A Time Travel restore overwrites the database **in place** and cancels in-flight queries and transactions. Never automate the restore command in CI, and do not repeatedly try timestamps until something looks right.
+
+### 7.1 Establish the recovery point before changing data
+
+First stop or minimize writes at the application/operator level. Record the incident time with an explicit timezone. Then verify that the database is on the supported backend:
+
+```bash
+npx wrangler d1 info DB
+```
+
+The output must report `version: production` before using this runbook. If it reports an older/unsupported backend, stop and use the backup mechanism appropriate to that database instead.
+
+Capture the **current** bookmark before any restore. This is the primary rollback handle if the chosen recovery point is wrong:
+
+```bash
+npx wrangler d1 time-travel info DB
+```
+
+When practical, also export the current database state before restoring and store the export outside the repository:
+
+```bash
+npx wrangler d1 export DB --remote --output ./bookmarks-before-restore.sql
+```
+
+Resolve the intended incident timestamp to a bookmark before executing a destructive restore. Use RFC3339 with an explicit offset or `Z`; do not use an ambiguous local time:
+
+```bash
+npx wrangler d1 time-travel info DB --timestamp="2026-09-10T10:15:00Z"
+```
+
+Copy the returned target bookmark into the incident notes and independently verify that the timestamp is inside the plan's retention window.
+
+### 7.2 Restore by the reviewed bookmark
+
+After the target is agreed, restore by bookmark rather than retyping the timestamp:
+
+```bash
+npx wrangler d1 time-travel restore DB --bookmark="<TARGET_BOOKMARK>"
+```
+
+Wrangler requires interactive confirmation. Save the `previous bookmark` reported by the restore command; it represents the database state immediately before the restore and is the fastest way to undo a mistaken recovery.
+
+Do not immediately run `npm run deploy` after a restore. That command applies pending migrations before publishing and may mutate the just-restored schema again.
+
+### 7.3 Verify application/schema compatibility before reopening writes
+
+Inspect the migration ledger and core schema after the restore:
+
+```bash
+npx wrangler d1 execute DB --remote --command \
+  "SELECT name FROM d1_migrations ORDER BY name;"
+npx wrangler d1 execute DB --remote --command \
+  "SELECT type, name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name;"
+```
+
+If the target point is **after** all migrations expected by the currently deployed Worker, run `npm run verify:remote-migrations` and then the normal authenticated smoke test.
+
+If the target point predates a schema migration, the current Worker may no longer be compatible with the restored schema. Keep writes closed and pair the database restore with the last known Worker deployment that expects that schema, or deliberately re-apply reviewed migrations only after deciding that doing so is part of the recovery. Do not leave newer code serving an older schema by accident.
+
+### 7.4 Undo a mistaken restore
+
+If validation shows that the chosen recovery point was wrong, restore to the `previous bookmark` captured from the restore output:
+
+```bash
+npx wrangler d1 time-travel restore DB --bookmark="<PREVIOUS_BOOKMARK>"
+```
+
+A restore does not invalidate older bookmarks, so an earlier valid point can still be selected if necessary. D1 currently limits restore operations per database; treat restore attempts as controlled incident actions rather than an exploratory loop.
+
+## 8. Workers compatibility-date maintenance
+
+`compatibility_date` opts the Worker into backwards-incompatible runtime fixes and features through that date. Updating the file does **not** change the already deployed Worker; the new date takes effect on the next Worker deployment.
+
+The repository keeps this date current through `.github/workflows/compatibility-date-review.yml`. The workflow runs monthly and fails its own scheduled check when `wrangler.toml` is more than 90 days old. It intentionally has read-only repository permissions and does not edit files, open PRs, or deploy anything automatically. Normal feature/hotfix PRs are not blocked merely because the scheduled reminder is stale.
+
+Run the same check locally at any time:
+
+```bash
+node scripts/check_compatibility_date.js --max-age-days 90
+```
+
+When advancing the date:
+
+1. Read Cloudflare's compatibility-flags history for every default change between the old and proposed dates.
+2. Change `wrangler.toml` in a dedicated PR. Avoid mixing unrelated dependency or application changes into the same compatibility bump.
+3. Run the normal quality gate and require `Browser smoke (Chromium)` to execute under the new date. The browser smoke starts `wrangler dev`, so it exercises the Worker runtime using the proposed compatibility configuration.
+4. If a newly enabled flag changes behavior the application depends on, adapt the code. A documented `no_*` compatibility flag can be used as a temporary holdback when necessary, but it should not become an undocumented permanent escape hatch.
+5. Merge only after the required checks pass. Deploy through the normal production release path; that deployment is the point at which the new compatibility date becomes live.
+
+The 2026-09-10 bump from 2025-11-21 crosses Cloudflare's 2026-08-04 change that enables Node.js compatibility by default for newer compatibility dates. The Worker request path does not intentionally depend on Node.js-only APIs, so the browser/runtime gate is mandatory for this bump rather than assuming the change is inert.
