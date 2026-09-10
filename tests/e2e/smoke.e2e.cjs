@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 
-const ADMIN_PASSWORD = 'ci-e2e-password-123';
+const ADMIN_PASSWORD = 'local-development-only';
 
 function alpineClick(page, expression) {
     return page.locator(`button[\\@click="${expression}"]`).first();
