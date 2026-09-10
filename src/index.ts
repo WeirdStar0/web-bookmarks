@@ -95,7 +95,9 @@ app.use('*', secureHeaders({
     crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-eval'"],
+        // No 'unsafe-eval': the dashboard runs the @alpinejs/csp build, whose
+        // restricted expression parser needs no Function constructor.
+        scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:"],
         connectSrc: ["'self'"],

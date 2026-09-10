@@ -10,7 +10,7 @@ export const html = (t: TemplateTranslations) => {
 <!DOCTYPE html>
 <html lang="${t.lang}">
 ${head(t)}
-<body class="bg-gray-100 dark:bg-gray-900 transition-colors duration-200" x-data="app()" x-init="init()" x-cloak data-translations="${translationsJson}">
+<body class="bg-gray-100 dark:bg-gray-900 transition-colors duration-200" x-data="app" x-init="init()" x-cloak data-translations="${translationsJson}">
     ${login(t)}
     ${main(t)}
     ${modals(t)}
