@@ -4,6 +4,20 @@ main = "src/index.ts"
 
 [observability]
 enabled = true
+# Search terms and other query parameters should not be persisted in request URLs.
+redact_query_string = true
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+# Keep logs at 100% for this low-volume personal service so rare failures remain visible.
+head_sampling_rate = 1
+
+[observability.traces]
+enabled = true
+# Traces are much higher-cardinality than logs. Sample 1% by default; raise only
+# for a short diagnostic window when needed.
+head_sampling_rate = 0.01
 
 # 环境变量 - 在 Cloudflare Dashboard 中配置这些变量
 # SECRET_KEY 是生产环境强制项（非 localhost 部署缺少它时请求会失败关闭）：
@@ -25,6 +39,3 @@ database_id = "56ba610f-f5f9-4771-8ac5-957d89fce6a4"
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
 id = "23d93f8a3f6c42b9a8d0a5270728c0b9"
-
-# [observability]
-# enabled = true
