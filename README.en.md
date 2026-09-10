@@ -72,102 +72,226 @@ Production also requires:
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks)
 
-Cloudflare's Deploy to Workers flow clones the repository, builds the Worker, and can automatically provision supported resources described by the Wrangler configuration, including D1 and KV. It also reads secrets declared in `.dev.vars.example` so required secret values can be entered during setup.
+If your goal is simply to get the application running, **use this method first**. The steps below follow the actual Cloudflare setup flow; in the normal case you do not need to run Wrangler commands manually.
 
-#### Step 1: Open the deploy flow
+#### Step 1: Open Deploy to Cloudflare Workers
 
-Click **Deploy to Cloudflare Workers**, sign in to Cloudflare, and select the account, repository name, and Worker name requested by the setup page.
+Click the button above and sign in to Cloudflare. Select the Cloudflare account requested by the setup page and confirm that you want to create a Worker from this repository.
 
-The deployment should prepare:
+Cloudflare reads the Wrangler configuration and prepares the Worker plus declared resources. Production requires:
 
 - D1 binding: `DB`
 - KV binding: `RATE_LIMIT_KV`
-- the Worker itself
+- Secret: `SECRET_KEY`
+- Secret: `INITIAL_ADMIN_PASSWORD`
+- Optional secret: `PASSWORD_PEPPER`
 
-If the setup page shows Build / Deploy commands, keep the repository-detected deploy script. **Production deployment must use `npm run deploy`.** Do not replace it with bare `npx wrangler deploy`, because this project's deploy script applies pending remote D1 migrations before publishing the Worker.
+#### Step 2: Confirm the Worker / D1 / KV resources
 
-#### Step 2: Configure the two required secrets
+Review the resource list shown by the deployment flow. A normal setup should include the Worker together with the declared D1 and KV resources.
 
-At minimum, configure the following two secrets when prompted.
+The final bindings must be:
 
-**`SECRET_KEY`**
+```text
+D1 binding: DB
+KV binding: RATE_LIMIT_KV
+```
 
-Generate a fresh random value; never use the example placeholder:
+If Cloudflare provisions the D1 database and KV namespace automatically, use those resources. Do not rename the bindings, because the application accesses them as `DB` and `RATE_LIMIT_KV`.
+
+#### Step 3: Set SECRET_KEY
+
+If the Deploy page shows a Secret input, set `SECRET_KEY` to a fresh random value.
+
+Generate one locally with:
 
 ```bash
 openssl rand -base64 32
 ```
 
-Without OpenSSL, Node.js can generate one:
+Without OpenSSL:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-Store the complete output as `SECRET_KEY`.
+Copy the **entire output** into `SECRET_KEY`. Do not use a placeholder from the README and do not commit the value to Git.
 
-**`INITIAL_ADMIN_PASSWORD`**
+#### Step 4: Set INITIAL_ADMIN_PASSWORD
 
-This is the password used for the first `admin` login:
+Set `INITIAL_ADMIN_PASSWORD` to the password you want to use for the first administrator login:
 
-- at least 12 characters;
-- do not use `12345`, `123456`, `admin`, or another known weak password;
-- generate and store it with a password manager if possible.
+- minimum 12 characters;
+- do not use `12345`, `123456`, `admin`, or another weak password;
+- preferably generate and store it in a password manager.
 
-For example:
+You can generate a random value with:
 
 ```bash
 openssl rand -base64 24
 ```
 
-> Keep this value. D1 stores only the password hash; the application cannot recover the original plaintext password from the database.
-
-#### Step 3: Optionally configure PASSWORD_PEPPER
-
-For stronger password-hash protection, configure `PASSWORD_PEPPER` in this format:
+**Your first production login will be:**
 
 ```text
-k1:<random-material>
+Username: admin
+Password: the INITIAL_ADMIN_PASSWORD value you entered here
 ```
 
-Generate the material with:
+The application stores only a password hash in D1, so it cannot recover this plaintext value later. Save it before continuing.
+
+#### Step 5: Optionally set PASSWORD_PEPPER
+
+This is not required to start the application, but it is recommended for stronger password-hash protection.
+
+Generate random material:
 
 ```bash
 openssl rand -base64 32
 ```
 
-Prefix the output with `k1:`. Keep the pepper only in Workers Secrets and a password manager. **Never store it in D1 or commit it to Git.**
+Then set the `PASSWORD_PEPPER` secret to:
 
-The application still works without `PASSWORD_PEPPER`; in that case it keeps using the v3 password-hash format.
+```text
+k1:<the generated random value>
+```
 
-#### Step 4: Finish deployment and verify bindings
+For example:
 
-After deployment, open the Worker in Cloudflare Dashboard and check **Settings / Bindings (or Variables and Secrets)**:
+```text
+k1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=
+```
 
-- the D1 binding must be named `DB`;
-- the KV binding must be named `RATE_LIMIT_KV`;
-- `SECRET_KEY` must exist as a secret;
-- `INITIAL_ADMIN_PASSWORD` must exist as a secret.
+Keep the complete pepper only in Cloudflare Worker Secrets and your password manager. **Do not store it in D1 or commit it to Git.**
 
-Normal production deployment uses `npm run deploy`, so D1 migrations are applied before the Worker is published. The runtime still retains an empty-database initialization fallback, but **do not treat "first request initializes the database" as the normal production deployment procedure**.
+#### Step 6: Deploy
 
-#### Step 5: First login
+After confirming resources and secrets, click Cloudflare's **Deploy / Create and deploy** action. The exact button label may change slightly as Cloudflare updates the UI.
 
-Open the `*.workers.dev` URL shown by Cloudflare, or your custom domain:
+If the setup page shows a Build / Deploy command, keep the repository-detected deployment flow. Production should use:
+
+```bash
+npm run deploy
+```
+
+Do not replace it with bare:
+
+```bash
+npx wrangler deploy
+```
+
+`npm run deploy` applies remote D1 migrations before publishing the Worker, preventing new code from running against an outdated schema.
+
+#### Step 7: If the Deploy page did not ask for secrets, add them in Dashboard after deployment
+
+Cloudflare's current Dashboard path is:
+
+```text
+Cloudflare Dashboard
+→ Workers & Pages
+→ select the Worker you just deployed
+→ Settings
+→ Variables and Secrets
+→ Add
+```
+
+Add:
+
+```text
+Type: Secret
+Variable name: SECRET_KEY
+Value: your random SECRET_KEY
+```
+
+Then add:
+
+```text
+Type: Secret
+Variable name: INITIAL_ADMIN_PASSWORD
+Value: your initial administrator password (at least 12 characters)
+```
+
+If you want the optional pepper, also add:
+
+```text
+Type: Secret
+Variable name: PASSWORD_PEPPER
+Value: k1:<random material>
+```
+
+Select **Deploy** after adding the secrets so the new values become active.
+
+> Cloudflare does not reveal a secret's original value after it is saved. Keep `SECRET_KEY`, `INITIAL_ADMIN_PASSWORD`, and the full `PASSWORD_PEPPER` (if enabled) in a password manager.
+
+#### Step 8: Verify D1 and KV bindings
+
+Stay on the Worker's **Settings** page and verify its resource bindings.
+
+You must have:
+
+```text
+D1 binding name = DB
+KV binding name = RATE_LIMIT_KV
+```
+
+If `RATE_LIMIT_KV` is missing, the page itself may still load, but `/api/login` returns 503 because this project refuses to expose authentication without login rate limiting.
+
+If the D1 binding is not named `DB`, the application cannot read or write its database correctly.
+
+#### Step 9: Open the Worker URL and sign in
+
+Return to the Worker Overview / Deployments area and open the `*.workers.dev` URL provided by Cloudflare, or your custom domain.
+
+Sign in with:
 
 ```text
 Username: admin
-Password: the value you set in INITIAL_ADMIN_PASSWORD
+Password: the INITIAL_ADMIN_PASSWORD value you set
 ```
 
-After the first successful login, change the initial password from Settings to your long-term administrator password. Changing the administrator username or password revokes existing sessions, so sign in again with the new credentials.
+After the first successful login, open Settings in the application and change the initial password to your long-term administrator password. Changing the username or password revokes existing sessions, so sign in again with the new credentials.
+
+#### Step 10: If you see 503, check initialization settings first
+
+If the first request returns:
+
+```text
+503 DEPLOYMENT_NOT_INITIALIZED
+```
+
+it usually means the production initialization requirements are incomplete, not that the application is broken.
+
+Start here:
+
+```text
+Workers & Pages
+→ your Worker
+→ Settings
+→ Variables and Secrets
+```
+
+Confirm that:
+
+- `SECRET_KEY` exists;
+- `INITIAL_ADMIN_PASSWORD` exists and has at least 12 characters;
+- then verify that D1 `DB` and KV `RATE_LIMIT_KV` bindings both exist.
+
+### One-click post-deploy checklist
+
+After deployment, verify these five items:
+
+- [ ] D1 binding is named `DB`
+- [ ] KV binding is named `RATE_LIMIT_KV`
+- [ ] `SECRET_KEY` is configured as a Secret
+- [ ] `INITIAL_ADMIN_PASSWORD` is configured and has at least 12 characters
+- [ ] `admin` + `INITIAL_ADMIN_PASSWORD` can sign in successfully
 
 #### One-click deployment troubleshooting
 
 | Symptom | Most likely cause | Fix |
 |---|---|---|
-| Page returns `503 DEPLOYMENT_NOT_INITIALIZED` | `SECRET_KEY` or `INITIAL_ADMIN_PASSWORD` is missing, or the initial password is shorter than 12 characters | Worker → Settings → Variables and Secrets: add/fix the secret, then reload |
-| Page opens but `/api/login` returns 503 | `RATE_LIMIT_KV` is missing or unavailable | Verify a KV namespace is bound to the Worker as `RATE_LIMIT_KV` |
+| Page returns `503 DEPLOYMENT_NOT_INITIALIZED` | `SECRET_KEY` or `INITIAL_ADMIN_PASSWORD` is missing, or the initial password is shorter than 12 characters | Worker → Settings → Variables and Secrets → Add; create/fix the value as type `Secret`, then select Deploy |
+| Page opens but `/api/login` returns 503 | `RATE_LIMIT_KV` is missing or unavailable | Verify that a KV namespace is bound to the Worker as `RATE_LIMIT_KV` |
 | You changed `INITIAL_ADMIN_PASSWORD` but the old login password still works | The administrator is already initialized; this secret is not a continuously synchronized current password | Change the password from Settings, or use the reset procedure below if locked out |
 | D1 reports `no such table` / `no such column` | The migration chain was not fully applied | Deploy through `npm run deploy`; if needed run `npm run db:migrate:remote`, then `npm run verify:remote-migrations` |
 | Login succeeds and immediately expires | `SECRET_KEY` is missing/changed or the browser still has a cookie signed with an older key | Verify the secret; after a key rotation, clear site cookies and sign in again |
