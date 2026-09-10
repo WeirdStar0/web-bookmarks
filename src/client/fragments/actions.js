@@ -61,7 +61,6 @@ openFolderModal(folder = null) {
         this.newFolderName = '';
         this.newFolderParentId = this.currentFolderId;
     }
-    this.selectorExpanded = {};
     this.selectorOpen = false;
     this.selectorQuery = '';
     this.showFolderModal = true;
@@ -104,7 +103,6 @@ openBookmarkModal(bookmark = null) {
         this.newBookmarkDescription = '';
         this.newBookmarkFolderId = this.currentFolderId;
     }
-    this.selectorExpanded = {};
     this.selectorOpen = false;
     this.selectorQuery = '';
     this.showBookmarkModal = true;
@@ -187,8 +185,22 @@ emptyTrash() {
 
 openSettingsModal() {
     this.rememberModalFocus();
+    this.settingsMenuOpen = false;
     this.settingsForm = { username: '', password: '' };
     this.showSettingsModal = true;
+},
+
+goToAllBookmarks() {
+    this.currentFolderId = null;
+    this.currentView = 'home';
+    this.searchQuery = '';
+    this.mobileMenuOpen = false;
+},
+
+goToTrash() {
+    this.currentView = 'trash';
+    this.loadTrash();
+    this.mobileMenuOpen = false;
 },
 
 async updateSettings() {

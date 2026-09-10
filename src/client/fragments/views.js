@@ -1,22 +1,11 @@
-escapeHtml(unsafe) {
-    if (!unsafe) return '';
-    return String(unsafe)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-},
-
 /**
  * Restrict a stored bookmark URL to http(s) before it reaches an href.
  *
  * Write paths already validate the protocol with zod, but rows created by
  * legacy versions or direct SQL writes can still hold `javascript:` and
- * similar schemes. The dashboard CSP allows 'unsafe-eval' because Alpine.js
- * requires it, so an unfiltered href would be directly executable. This keeps
- * the dashboard consistent with the export path and the extension, which both
- * already apply the same allowlist.
+ * similar schemes, so the href binding filters again as defense in depth.
+ * This keeps the dashboard consistent with the export path and the
+ * extension, which both apply the same allowlist.
  *
  * The original string is returned verbatim on success so no normalization
  * side effects are introduced into existing links. This is deliberately a
@@ -93,70 +82,88 @@ getFolderBookmarkCount(folderId) {
     return this.folderCounts[folderId] || 0;
 },
 
-get sidebarHtml() {
-    if (!this._sidebarDirty && this._sidebarCache !== null) {
-        return this._sidebarCache;
-    }
-
-    const renderFolder = (folder, level = 0) => {
-        const isExpanded = this.expandedFolders[folder.id];
-        const isSelected = this.currentFolderId === folder.id;
-        const hasChildren = this.folders.some(f => f.parent_id === folder.id);
-        const paddingLeft = level * 16 + 8;
-
-        const selectedClass = isSelected ? 'bg-gray-100 dark:bg-gray-700' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700';
-        const expandedClass = isExpanded ? 'rotate-90' : '';
-        const invisibleClass = !hasChildren ? 'invisible' : '';
-
-        let html = '<div class="select-none sidebar-folder-item" data-folder-id="' + folder.id + '">';
-        html += '<div class="w-full flex items-center py-1.5 rounded-md text-sm transition-all duration-200 ' + selectedClass + '" ';
-        html += 'style="padding-left: ' + paddingLeft + 'px">';
-
-        html += '<div class="p-1 mr-0.5 cursor-pointer text-gray-400 transform transition-transform ' + expandedClass + ' ' + invisibleClass + '" data-action="toggle" data-id="' + folder.id + '">';
-        html += '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>';
-        html += '</div>';
-        html += '<div class="flex-1 flex items-center cursor-pointer overflow-hidden" data-action="select" data-id="' + folder.id + '">';
-        html += '<svg class="w-5 h-5 mr-2 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>';
-        html += '<span class="truncate">' + this.escapeHtml(folder.name) + '</span>';
-        html += '<span class="text-xs text-gray-400 ml-2">' + this.getFolderBookmarkCount(folder.id) + '</span>';
-        html += '</div>';
-        html += '</div>';
-        html += '</div>';
-
-        if (isExpanded && hasChildren) {
-            const children = this.folders.filter(f => f.parent_id === folder.id);
-            children.sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
-            html += '<div class="space-y-0.5 mt-0.5">';
-            children.forEach(child => {
-                html += renderFolder(child, level + 1);
+/**
+ * Flat render list for the sidebar tree. Alpine's CSP build has no x-html,
+ * so the sidebar renders through x-for: the tree is flattened into the rows
+ * that are currently visible (collapsed subtrees are simply absent). The
+ * visited set keeps the walk finite if legacy rows contain a parent_id
+ * cycle (migration 007 only blocks new ones).
+ */
+get sidebarFolders() {
+    const rows = [];
+    const visited = new Set();
+    const walk = (parentId, level) => {
+        const children = this.folders
+            .filter(f => f.parent_id === parentId && !visited.has(f.id))
+            .sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
+        for (const folder of children) {
+            visited.add(folder.id);
+            rows.push({
+                id: folder.id,
+                name: folder.name,
+                paddingLeft: level * 16 + 8,
+                hasChildren: this.folders.some(f => f.parent_id === folder.id),
+                bookmarkCount: this.getFolderBookmarkCount(folder.id),
             });
-            html += '</div>';
+            if (this.expandedFolders[folder.id]) {
+                walk(folder.id, level + 1);
+            }
         }
-        return html;
     };
-
-    const roots = this.folders.filter(f => !f.parent_id);
-    roots.sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
-    this._sidebarCache = roots.map(f => renderFolder(f)).join('');
-    this._sidebarDirty = false;
-    return this._sidebarCache;
+    walk(null, 0);
+    return rows;
 },
 
-handleSidebarClick(event) {
-    const target = event.target.closest('[data-action]');
-    if (!target) return;
+selectSidebarFolder(id) {
+    this.currentFolderId = id;
+    this.currentView = 'home';
+    this.mobileMenuOpen = false;
+},
 
-    const action = target.dataset.action;
-    const idStr = target.dataset.id;
-    const id = parseInt(idStr, 10);
-
-    if (action === 'toggle') {
-        this.toggleFolder(id);
-    } else if (action === 'select') {
-        this.currentFolderId = id;
-        this.currentView = 'home';
-        this.mobileMenuOpen = false;
+openFolderIfHome(folder) {
+    if (!this.isSorting && this.currentView === 'home') {
+        this.currentFolderId = folder.id;
     }
+},
+
+folderSubtitle(folder) {
+    if (this.currentView !== 'home') {
+        return window.translations?.dashboard?.deleted ?? 'Deleted';
+    }
+    const childCount = this.folders.filter(f => f.parent_id === folder.id).length;
+    const labels = window.translations?.dashboard;
+    return childCount + ' ' + (labels?.folders ?? 'folders') + ', '
+        + this.getFolderBookmarkCount(folder.id) + ' ' + (labels?.bookmarks ?? 'bookmarks');
+},
+
+folderCardClasses(folder) {
+    const classes = [];
+    if (this.draggedItem?.type === 'folder' && this.draggedItem?.id === folder.id) {
+        classes.push('opacity-40 scale-95 shadow-lg');
+    }
+    if (this.dropTarget?.type === 'folder' && this.dropTarget?.id === folder.id) {
+        classes.push('border-blue-500 shadow-lg shadow-blue-500/20 bg-blue-50 dark:bg-blue-900/20');
+    }
+    if (this.isSorting && this.currentView === 'home' && !this.searchQuery) {
+        classes.push('cursor-grab active:cursor-grabbing');
+    } else if (!this.isSorting && this.currentView === 'home') {
+        classes.push('cursor-pointer');
+    }
+    return classes.join(' ');
+},
+
+bookmarkCardClasses(bookmark) {
+    const classes = [];
+    if (this.draggedItem?.type === 'bookmark' && this.draggedItem?.id === bookmark.id) {
+        classes.push('opacity-40 scale-95 shadow-lg');
+    }
+    if (this.dropTarget?.type === 'bookmark' && this.dropTarget?.id === bookmark.id) {
+        classes.push('border-blue-500 shadow-lg shadow-blue-500/20 bg-blue-50 dark:bg-blue-900/20');
+    }
+    if (this.isSorting && this.currentView === 'home' && !this.searchQuery) {
+        classes.push('cursor-grab active:cursor-grabbing');
+    }
+    return classes.join(' ');
 },
 
 getFolderName(id) {
@@ -166,16 +173,23 @@ getFolderName(id) {
 },
 
 /**
- * Render the folder picker options. `targetField` is the component field the
- * selection writes to ('newFolderParentId' for the folder modal,
- * 'newBookmarkFolderId' for the bookmark modal) and is supplied explicitly by
- * the caller so both pickers stay independent even when both modals are open.
- *
- * The folder name is never embedded into an Alpine expression. It is placed
- * as HTML-escaped text inside a plain <span>, so a folder name containing
- * quotes or script syntax cannot be executed.
+ * Option lists for the two folder pickers. Alpine's CSP build has no
+ * x-html, so the pickers render through x-for over plain option objects;
+ * names reach the DOM only via x-text, which escapes them. Each picker has
+ * its own getter so it renders from its own target field
+ * ('newFolderParentId' for the folder modal, 'newBookmarkFolderId' for the
+ * bookmark modal) and the two stay independent even when both modals are
+ * open.
  */
-folderSelectorTemplate(targetField, editingId) {
+get folderModalSelectorOptions() {
+    return this.buildSelectorOptions(this.editingId);
+},
+
+get bookmarkModalSelectorOptions() {
+    return this.buildSelectorOptions(null);
+},
+
+buildSelectorOptions(editingId) {
     const query = (this.selectorQuery || '').trim().toLowerCase();
 
     // `editingId` is constant for one render, so resolve the folders that
@@ -197,63 +211,54 @@ folderSelectorTemplate(targetField, editingId) {
             }
         }
     }
-    const canBeParent = (folder) =>
-        editingId === null || editingId === undefined || !forbiddenParents.has(folder.id);
 
     // Guard against cycles rather than relying on the current data model.
-    //
     // With a single parent pointer a cycle has no `parent_id = null` entry
-    // point, so a walk from the root cannot reach it today; such rows simply
-    // render as a missing subtree. That is a property of the traversal root,
-    // not of the data, and it would stop holding if orphan subtrees were ever
-    // rendered here to surface those hidden folders. The visited set keeps
-    // that change safe and costs one Set lookup per node.
+    // point, so a walk from the root cannot reach it today; the visited set
+    // keeps that property from silently mattering if it ever stops holding.
     const visited = new Set();
-
-    const build = (parentId, depth = 0) => {
-        let children = this.folders.filter(f => f.parent_id === parentId);
-        children.sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
-
-        let html = '';
+    const build = (parentId, depth) => {
+        const children = this.folders
+            .filter(f => f.parent_id === parentId && !visited.has(f.id))
+            .sort((a, b) => (a.sort_order - b.sort_order) || a.name.localeCompare(b.name));
+        const rows = [];
         for (const folder of children) {
-            if (visited.has(folder.id)) continue;
             visited.add(folder.id);
-
+            const childRows = build(folder.id, depth + 1);
             const matches = !query || folder.name.toLowerCase().includes(query);
-            const childHtml = build(folder.id, depth + 1);
-            if (!matches && !childHtml) continue;
-
-            const selectable = canBeParent(folder);
-            const classes = 'block w-full text-left pr-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm truncate'
-                + (selectable ? '' : ' opacity-40 cursor-not-allowed');
-            const clickHandler = selectable
-                ? `@click="selectFolderOption($event, '${targetField}')"`
-                : '';
-            const padding = 16 + depth * 16;
-
-            html += `<button type="button" role="option" data-folder-id="${folder.id}" ${clickHandler} :aria-selected="${targetField} === ${folder.id}" style="padding-left: ${padding}px" class="${classes}" ${selectable ? '' : 'disabled'}>`;
-            html += `<span>${this.escapeHtml(folder.name)}</span>`;
-            html += '</button>';
-            html += childHtml;
+            // Keep an ancestor row when the query matches one of its
+            // descendants so the path to the match stays readable.
+            if (!matches && childRows.length === 0) continue;
+            rows.push({
+                id: folder.id,
+                name: folder.name,
+                paddingLeft: 16 + depth * 16,
+                selectable: editingId === null || editingId === undefined || !forbiddenParents.has(folder.id),
+            });
+            for (const child of childRows) rows.push(child);
         }
-        return html;
+        return rows;
     };
 
-    return build(null);
+    return build(null, 0);
 },
 
-selectFolderOption(event, targetField) {
-    const row = event.currentTarget;
-    this[targetField] = Number(row.dataset.folderId);
+selectFolderOption(targetField, folderId) {
+    this[targetField] = folderId;
     this.selectorOpen = false;
     this.selectorQuery = '';
 },
 
-toggleSelector(id) {
-    this.selectorExpanded[id] = !this.selectorExpanded[id];
+selectRootFolderOption(targetField) {
+    this[targetField] = null;
+    this.selectorOpen = false;
+    this.selectorQuery = '';
+},
+
+triggerImportClick() {
+    this.$refs.importInput.click();
 },
 
 toggleFolder(id) {
     this.expandedFolders[id] = !this.expandedFolders[id];
-    this._sidebarDirty = true;
 }

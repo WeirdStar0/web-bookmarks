@@ -62,15 +62,15 @@ export const main = (t: TemplateTranslations) => `
                             <svg x-show="darkMode" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
                         </button>
                         
-                        <div class="relative" x-data="{ open: false }" @click.away="open = false">
-                            <button @click="open = !open" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        <div class="relative" @click.away="settingsMenuOpen = false">
+                            <button @click="settingsMenuOpen = !settingsMenuOpen" class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                                 <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-bold shadow-sm">
                                     A
                                 </div>
                             </button>
-                            
-                            <div x-show="open" class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-1 border border-gray-100 dark:border-gray-700 transform origin-top-right transition-all" x-transition:enter="ui-transition" x-transition:enter-start="ui-transition-start" x-transition:enter-end="ui-transition-end" x-transition:leave="ui-transition" x-transition:leave-start="ui-transition-end" x-transition:leave-end="ui-transition-start">
-                                <button @click="openSettingsModal(); open = false" class="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+
+                            <div x-show="settingsMenuOpen" class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-1 border border-gray-100 dark:border-gray-700 transform origin-top-right transition-all" x-transition:enter="ui-transition" x-transition:enter-start="ui-transition-start" x-transition:enter-end="ui-transition-end" x-transition:leave="ui-transition" x-transition:leave-start="ui-transition-end" x-transition:leave-end="ui-transition-start">
+                                <button @click="openSettingsModal()" class="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
                                     <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                                     ${t.dashboard.settings}
                                 </button>
@@ -103,12 +103,12 @@ export const main = (t: TemplateTranslations) => `
             <aside :class="mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'" 
                    class="fixed inset-y-0 left-0 w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 z-50 md:relative md:translate-x-0 transition-transform duration-300 md:flex md:flex-col overflow-hidden">
                 <div class="p-4 space-y-1 flex-shrink-0">
-                    <button @click="currentFolderId = null; currentView = 'home'; searchQuery = ''; mobileMenuOpen = false" :class="{'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400': currentFolderId === null && currentView === 'home', 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700': !(currentFolderId === null && currentView === 'home')}" class="w-full flex items-center px-3 py-2 rounded-lg transition-colors font-medium">
+                    <button @click="goToAllBookmarks()" :class="{'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400': currentFolderId === null && currentView === 'home', 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700': !(currentFolderId === null && currentView === 'home')}" class="w-full flex items-center px-3 py-2 rounded-lg transition-colors font-medium">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
                         ${t.dashboard.allBookmarks}
                     </button>
                     
-                    <button @click="currentView = 'trash'; loadTrash(); mobileMenuOpen = false" :class="{'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400': currentView === 'trash', 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700': currentView !== 'trash'}" class="w-full flex items-center px-3 py-2 rounded-lg transition-colors font-medium">
+                    <button @click="goToTrash()" :class="{'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400': currentView === 'trash', 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700': currentView !== 'trash'}" class="w-full flex items-center px-3 py-2 rounded-lg transition-colors font-medium">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                         ${t.dashboard.trash}
                     </button>
@@ -116,9 +116,24 @@ export const main = (t: TemplateTranslations) => `
 
                 <div class="flex-1 overflow-y-auto px-4 py-2">
                     <h3 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">${t.dashboard.folders}</h3>
-                    <div class="space-y-0.5"
-                         x-html="sidebarHtml"
-                         @click="handleSidebarClick($event)"></div>
+                    <div class="space-y-0.5">
+                        <template x-for="folder in sidebarFolders" :key="folder.id">
+                            <div class="w-full flex items-center py-1.5 rounded-md text-sm transition-all duration-200"
+                                 :class="folder.id === currentFolderId ? 'bg-gray-100 dark:bg-gray-700' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'"
+                                 :style="'padding-left: ' + folder.paddingLeft + 'px'">
+                                <div class="p-1 mr-0.5 cursor-pointer text-gray-400 transform transition-transform"
+                                     :class="!folder.hasChildren ? 'invisible' : (expandedFolders[folder.id] ? 'rotate-90' : '')"
+                                     @click="toggleFolder(folder.id)">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                </div>
+                                <div class="flex-1 flex items-center cursor-pointer overflow-hidden" @click="selectSidebarFolder(folder.id)">
+                                    <svg class="w-5 h-5 mr-2 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
+                                    <span class="truncate" x-text="folder.name"></span>
+                                    <span class="text-xs text-gray-400 ml-2" x-text="folder.bookmarkCount"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
                 </div>
             </aside>
 
@@ -130,7 +145,7 @@ export const main = (t: TemplateTranslations) => `
                 <!-- Breadcrumbs (Home View) -->
                 <div x-show="currentView === 'home' && !searchQuery" class="flex items-center text-sm text-gray-500 dark:text-gray-400 mb-6 overflow-x-auto whitespace-nowrap no-scrollbar">
                     <button @click="currentFolderId = null" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-1">${t.dashboard.home}</button>
-                    <template x-for="(folder, index) in breadcrumbs" :key="folder.id">
+                    <template x-for="folder in breadcrumbs" :key="folder.id">
                         <div class="flex items-center">
                             <svg class="w-4 h-4 mx-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             <button @click="currentFolderId = folder.id" class="hover:text-blue-600 dark:hover:text-blue-400 transition-colors px-1 font-medium" x-text="folder.name"></button>
@@ -219,19 +234,14 @@ export const main = (t: TemplateTranslations) => `
                                      :draggable="isSorting && currentView === 'home' && !searchQuery"
                                      @dragstart="handleDragStart($event, folder, 'folder')"
                                      @dragend="handleDragEnd($event)"
-                                     @click="!isSorting && currentView === 'home' ? currentFolderId = folder.id : null"
-                                     :class="{
-                                        'opacity-40 scale-95 shadow-lg': draggedItem?.type === 'folder' && draggedItem?.id === folder.id,
-                                        'border-blue-500 shadow-lg shadow-blue-500/20 bg-blue-50 dark:bg-blue-900/20': dropTarget?.type === 'folder' && dropTarget?.id === folder.id,
-                                        'cursor-grab active:cursor-grabbing': isSorting && currentView === 'home' && !searchQuery,
-                                        'cursor-pointer': !isSorting && currentView === 'home'
-                                     }">
+                                     @click="openFolderIfHome(folder)"
+                                     :class="folderCardClasses(folder)">
                                     <div class="flex flex-col items-center text-center">
                                         <div class="w-12 h-12 mb-3 text-yellow-500 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform pointer-events-none">
                                             <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path></svg>
                                         </div>
                                         <h3 class="text-sm font-medium text-gray-900 dark:text-gray-200 truncate w-full pointer-events-none" x-text="folder.name"></h3>
-                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 pointer-events-none" x-text="currentView === 'home' ? (folders.filter(f => f.parent_id === folder.id).length + ' ${t.dashboard.folders}, ' + getFolderBookmarkCount(folder.id) + ' ${t.dashboard.bookmarks}') : '${t.dashboard.deleted}'"></p>
+                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 pointer-events-none" x-text="folderSubtitle(folder)"></p>
                                     </div>
 
                                     <!-- Home View Actions -->
@@ -305,11 +315,7 @@ export const main = (t: TemplateTranslations) => `
                                      :draggable="isSorting && currentView === 'home' && !searchQuery"
                                      @dragstart="handleDragStart($event, bookmark, 'bookmark')"
                                      @dragend="handleDragEnd($event)"
-                                     :class="{
-                                        'opacity-40 scale-95 shadow-lg': draggedItem?.type === 'bookmark' && draggedItem?.id === bookmark.id,
-                                        'border-blue-500 shadow-lg shadow-blue-500/20 bg-blue-50 dark:bg-blue-900/20': dropTarget?.type === 'bookmark' && dropTarget?.id === bookmark.id,
-                                        'cursor-grab active:cursor-grabbing': isSorting && currentView === 'home' && !searchQuery
-                                     }">
+                                     :class="bookmarkCardClasses(bookmark)">
                                     <a :href="currentView === 'home' && !isSorting ? safeBookmarkUrl(bookmark.url) : '#'" :target="currentView === 'home' && !isSorting && safeBookmarkUrl(bookmark.url) !== '#' ? '_blank' : ''" :rel="currentView === 'home' && !isSorting && safeBookmarkUrl(bookmark.url) !== '#' ? 'noopener' : ''" class="flex items-start space-x-3" :class="isSorting ? 'cursor-default' : ''">
                                         <div class="flex-shrink-0 w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center text-gray-500 dark:text-gray-400 font-bold text-lg uppercase pointer-events-none">
                                             <span x-text="bookmark.title.charAt(0)"></span>

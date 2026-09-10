@@ -11,13 +11,16 @@ describe('importcsp', () => {
         resetInitState();
     });
 
-    it('returns CSP header with style-src unsafe-inline and without script-src unsafe-inline', async () => {
+    it('returns a CSP header without script-src unsafe-eval or unsafe-inline', async () => {
+        // The dashboard runs the @alpinejs/csp build, whose restricted
+        // expression parser is what makes dropping 'unsafe-eval' possible.
         const response = await app.fetch(new Request('https://example.com/'), env);
         expect(response.status).toBe(200);
         const csp = response.headers.get('content-security-policy');
         expect(csp).toBeTruthy();
         expect(csp).toContain("style-src 'self' 'unsafe-inline'");
-        expect(csp).toContain("script-src 'self' 'unsafe-eval'");
+        expect(csp).toContain("script-src 'self'");
+        expect(csp).not.toContain('unsafe-eval');
         expect(csp).not.toContain("script-src 'self' 'unsafe-inline'");
     });
 });

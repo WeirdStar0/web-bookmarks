@@ -28,10 +28,19 @@ export const modals = (t: TemplateTranslations) => `
                             <input type="text" x-model="selectorQuery" placeholder="${t.modals.searchFolders}" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent">
                         </div>
                         <div class="py-1">
-                            <button type="button" role="option" :aria-selected="newFolderParentId === null" @click="newFolderParentId = null; selectorOpen = false; selectorQuery = ''" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm">
+                            <button type="button" role="option" :aria-selected="newFolderParentId === null" @click="selectRootFolderOption('newFolderParentId')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm">
                                 ${t.modals.rootFolder}
                             </button>
-                            <div x-html="folderSelectorTemplate('newFolderParentId', editingId)"></div>
+                            <template x-for="option in folderModalSelectorOptions" :key="option.id">
+                                <button type="button" role="option" :aria-selected="newFolderParentId === option.id"
+                                        @click="selectFolderOption('newFolderParentId', option.id)"
+                                        :disabled="!option.selectable"
+                                        :style="'padding-left: ' + option.paddingLeft + 'px'"
+                                        class="block w-full text-left pr-4 py-2 text-gray-900 dark:text-white text-sm truncate"
+                                        :class="option.selectable ? 'hover:bg-gray-100 dark:hover:bg-gray-600' : 'opacity-40 cursor-not-allowed'">
+                                    <span x-text="option.name"></span>
+                                </button>
+                            </template>
                         </div>
                     </div>
                 </div>
@@ -72,10 +81,19 @@ export const modals = (t: TemplateTranslations) => `
                                 <input type="text" x-model="selectorQuery" placeholder="${t.modals.searchFolders}" class="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-transparent">
                             </div>
                             <div class="py-1">
-                                <button type="button" role="option" :aria-selected="newBookmarkFolderId === null" @click="newBookmarkFolderId = null; selectorOpen = false; selectorQuery = ''" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm">
+                                <button type="button" role="option" :aria-selected="newBookmarkFolderId === null" @click="selectRootFolderOption('newBookmarkFolderId')" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm">
                                     ${t.modals.rootFolder}
                                 </button>
-                                <div x-html="folderSelectorTemplate('newBookmarkFolderId', null)"></div>
+                                <template x-for="option in bookmarkModalSelectorOptions" :key="option.id">
+                                    <button type="button" role="option" :aria-selected="newBookmarkFolderId === option.id"
+                                            @click="selectFolderOption('newBookmarkFolderId', option.id)"
+                                            :disabled="!option.selectable"
+                                            :style="'padding-left: ' + option.paddingLeft + 'px'"
+                                            class="block w-full text-left pr-4 py-2 text-gray-900 dark:text-white text-sm truncate"
+                                            :class="option.selectable ? 'hover:bg-gray-100 dark:hover:bg-gray-600' : 'opacity-40 cursor-not-allowed'">
+                                        <span x-text="option.name"></span>
+                                    </button>
+                                </template>
                             </div>
                         </div>
                     </div>
@@ -107,7 +125,7 @@ export const modals = (t: TemplateTranslations) => `
                 <div class="flex justify-between items-center gap-3">
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-300">${t.modals.dataManagement}</span>
                     <div class="space-x-2 whitespace-nowrap">
-                        <button type="button" @click="$refs.importInput.click()" class="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded transition-colors">${t.modals.import}</button>
+                        <button type="button" @click="triggerImportClick()" class="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded transition-colors">${t.modals.import}</button>
                         <input type="file" x-ref="importInput" class="hidden" accept=".html,text/html" @change="importBookmarks($event)">
                         <a href="/api/export" target="_blank" rel="noopener" class="px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded transition-colors inline-block">${t.modals.export}</a>
                     </div>

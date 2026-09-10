@@ -43,12 +43,12 @@ newBookmarkTitle: '',
 newBookmarkUrl: '',
 newBookmarkDescription: '',
 newBookmarkFolderId: null,
-selectorExpanded: {},
 selectorOpen: false,
 selectorQuery: '',
 
 showSettingsModal: false,
 settingsForm: { username: '', password: '' },
+settingsMenuOpen: false,
 
 showConfirmModal: false,
 confirmMessage: '',
@@ -62,8 +62,6 @@ isSorting: false,
 
 t: window.translations,
 
-    _sidebarCache: null,
-    _sidebarDirty: true,
     _dataLoadVersion: 0,
     _loadedFolderId: null,
     _folderLoadingTimer: null,

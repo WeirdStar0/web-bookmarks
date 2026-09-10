@@ -33,12 +33,12 @@ function createAppState(): Record<string, any> {
     return g.window.app() as Record<string, any>;
 }
 
-function folderButtons(html: string): Map<number, string> {
-    const buttons = new Map<number, string>();
-    for (const match of html.matchAll(/<button[^>]*data-folder-id="(\d+)"[^>]*>/g)) {
-        buttons.set(Number(match[1]), match[0]);
+function folderOptions(state: Record<string, any>, editingId: number | null): Map<number, Record<string, any>> {
+    const options = new Map<number, Record<string, any>>();
+    for (const option of state.buildSelectorOptions(editingId) as Array<Record<string, any>>) {
+        options.set(Number(option.id), option);
     }
-    return buttons;
+    return options;
 }
 
 describe('client guards', () => {
@@ -136,20 +136,22 @@ describe('client guards', () => {
         state.newFolderParentId = null;
         state.editingId = 2;
 
-        const html = state.folderSelectorTemplate('newFolderParentId', 2) as string;
-        const buttons = folderButtons(html);
+        const options = folderOptions(state, 2);
 
         // Every folder is still listed so the tree stays readable, but only
         // folders outside the edited subtree are selectable.
-        expect([...buttons.keys()].sort()).toEqual([1, 2, 3, 4, 5]);
+        expect([...options.keys()].sort()).toEqual([1, 2, 3, 4, 5]);
 
-        expect(buttons.get(1)).toContain("selectFolderOption($event, 'newFolderParentId')");
-        expect(buttons.get(5)).toContain("selectFolderOption($event, 'newFolderParentId')");
+        expect(options.get(1)?.selectable).toBe(true);
+        expect(options.get(5)?.selectable).toBe(true);
 
         for (const id of [2, 3, 4]) {
-            expect(buttons.get(id), `folder ${id} must not be selectable`).not.toContain('selectFolderOption');
-            expect(buttons.get(id), `folder ${id} must be disabled`).toContain('disabled');
+            expect(options.get(id)?.selectable, `folder ${id} must not be selectable`).toBe(false);
         }
+
+        // Indentation still reflects tree depth for readable nesting.
+        expect(options.get(1)?.paddingLeft).toBe(16);
+        expect(options.get(4)?.paddingLeft).toBe(64);
     });
 
     it('omits cycle folders from the parent selector because they are unreachable from the root', () => {
@@ -163,9 +165,22 @@ describe('client guards', () => {
         state.newFolderParentId = null;
         state.editingId = null;
 
-        const html = state.folderSelectorTemplate('newFolderParentId', null) as string;
-        expect(html).toContain('Visible');
-        expect(html).not.toContain('Cycle A');
-        expect(html).not.toContain('Cycle B');
+        const options = folderOptions(state, null);
+        expect([...options.keys()]).toEqual([1]);
+    });
+
+    it('terminates the sidebar walk on legacy folder cycles', () => {
+        const state = createAppState();
+        state.folders = [
+            { id: 1, name: 'Cycle A', parent_id: 2, sort_order: 0 },
+            { id: 2, name: 'Cycle B', parent_id: 1, sort_order: 0 },
+        ];
+        state.expandedFolders = {};
+        state.folderCounts = {};
+
+        // Reaching this assertion at all proves the flatten walk terminates;
+        // cycle folders are simply unreachable from the null root.
+        const rows = state.sidebarFolders as Array<Record<string, any>>;
+        expect(rows).toEqual([]);
     });
 });
