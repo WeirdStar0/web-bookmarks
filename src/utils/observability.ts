@@ -1,6 +1,3 @@
-import type { MiddlewareHandler } from 'hono';
-import type { Bindings, Variables } from '../types';
-
 type D1MetaLike = {
     rows_read?: number;
     rows_written?: number;
@@ -96,35 +93,15 @@ export function logD1RouteSummary(
     });
 }
 
-/**
- * Hono's stock logger emits a human-formatted request target. Persisted
- * observability logs should instead be structured and must never include the
- * URL query string (search terms can be user data).
- */
-export const apiRequestLogMiddleware: MiddlewareHandler<{
-    Bindings: Bindings;
-    Variables: Variables;
-}> = async (c, next) => {
-    const startedAt = Date.now();
-    await next();
-
-    const ray = c.req.header('CF-Ray');
-    console.log({
-        event: 'http.request',
-        method: c.req.method,
-        path: new URL(c.req.url).pathname,
-        status: c.res.status,
-        duration_ms: Date.now() - startedAt,
-        ...(ray ? { cf_ray: ray } : {}),
-    });
-};
-
 export function logRequestError(
     level: 'warn' | 'error',
     event: string,
     request: { method: string; url: string; ray?: string },
     fields: Record<string, unknown>,
 ): void {
+    // Deliberately reduce the request URL to pathname. Query strings can hold
+    // search terms and other user data; Cloudflare invocation logs separately
+    // apply `redact_query_string = true` at the platform level.
     const payload = {
         event,
         method: request.method,
