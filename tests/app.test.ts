@@ -87,3 +87,4 @@ import './suites/importbudget.suite';
 import './suites/passwordbudget.suite';
 import './suites/folderroundtrip.suite';
 import './suites/clientguards.suite';
+import './suites/observability.suite';
