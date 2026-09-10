@@ -33,7 +33,7 @@ describe('observability helpers', () => {
         expect(summarizeD1Results([{ meta: {} }, {}])).toBeNull();
     });
 
-    it('logs route-level metrics without query text or user data', () => {
+    it('logs indexable route-level fields without query text or user data', () => {
         const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
         try {
             logD1RouteSummary('/api/search', [{
@@ -46,7 +46,7 @@ describe('observability helpers', () => {
             }], 3);
 
             expect(log).toHaveBeenCalledTimes(1);
-            const payload = JSON.parse(String(log.mock.calls[0][0]));
+            const payload = log.mock.calls[0][0];
             expect(payload).toEqual({
                 event: 'd1.route_summary',
                 route: '/api/search',
@@ -57,8 +57,9 @@ describe('observability helpers', () => {
                 max_attempts: 1,
                 rows_returned: 3,
             });
-            expect(JSON.stringify(payload)).not.toContain('query');
-            expect(JSON.stringify(payload)).not.toContain('bookmark');
+            expect(typeof payload).toBe('object');
+            expect(JSON.stringify(payload)).not.toContain('search term');
+            expect(JSON.stringify(payload)).not.toContain('bookmark title');
         } finally {
             log.mockRestore();
         }
