@@ -85,13 +85,15 @@ export function logD1RouteSummary(
     // misleading all-zero production-style record in that environment.
     if (!summary) return;
 
-    console.log(JSON.stringify({
+    // Log the object itself so Workers Logs extracts/indexes each field instead
+    // of storing one opaque JSON string under `message`.
+    console.log({
         event: 'd1.route_summary',
         route,
         ...(mode ? { mode } : {}),
         ...summary,
         rows_returned: rowsReturned,
-    }));
+    });
 }
 
 /**
@@ -107,14 +109,14 @@ export const apiRequestLogMiddleware: MiddlewareHandler<{
     await next();
 
     const ray = c.req.header('CF-Ray');
-    console.log(JSON.stringify({
+    console.log({
         event: 'http.request',
         method: c.req.method,
         path: new URL(c.req.url).pathname,
         status: c.res.status,
         duration_ms: Date.now() - startedAt,
         ...(ray ? { cf_ray: ray } : {}),
-    }));
+    });
 };
 
 export function logRequestError(
@@ -123,12 +125,12 @@ export function logRequestError(
     request: { method: string; url: string; ray?: string },
     fields: Record<string, unknown>,
 ): void {
-    const payload = JSON.stringify({
+    const payload = {
         event,
         method: request.method,
         path: new URL(request.url).pathname,
         ...(request.ray ? { cf_ray: request.ray } : {}),
         ...fields,
-    });
+    };
     console[level](payload);
 }
