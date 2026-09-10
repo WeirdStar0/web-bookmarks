@@ -52,7 +52,7 @@
     "@alpinejs/csp": "~3.17.2",
     "@cloudflare/vitest-pool-workers": "^0.11.1",
     "@cloudflare/workers-types": "^4.20251121.0",
-    "@types/node": "^24.10.1",
+    "@types/node": "^26.4.1",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
     "esbuild": "^0.25.11",
