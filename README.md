@@ -53,51 +53,383 @@
 
 ## 🚀 快速部署
 
-### 方法一：一键部署 (推荐)
+### 登录账号先说明清楚
+
+**生产环境没有固定的默认密码。** `12345`、`123456`、`admin` 都不是当前版本的生产默认密码。
+
+首次初始化后的登录凭据是：
+
+- **用户名：** `admin`
+- **密码：** 你部署时设置的 `INITIAL_ADMIN_PASSWORD`（至少 12 个字符，建议使用独立的强随机密码）
+
+`INITIAL_ADMIN_PASSWORD` 只用于**首次创建管理员账号**，以及把历史版本遗留的已知弱默认密码替换掉。管理员已经成功初始化后，再修改这个 Worker Secret **不会自动修改现有登录密码**；已经能登录时，请在页面的“设置”中修改长期密码。
+
+生产环境同时要求：
+
+- `SECRET_KEY`：**必需**，用于签名登录 Cookie，建议至少 32 字节随机值；
+- `RATE_LIMIT_KV`：**必需**，用于登录限流；
+- `PASSWORD_PEPPER`：可选但推荐，用于进一步保护数据库中的密码哈希。
+
+### 方法一：一键部署（推荐）
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks)
 
-点击上方的 **Deploy to Cloudflare Workers** 按钮。它会自动：
-1. Fork/Clone 本仓库到你的账号。
-2. 在 Cloudflare 中创建 Worker。
-3. 自动创建并绑定 D1 数据库。
+如果你只是想把项目部署起来使用，**优先选这一种**。下面按实际操作顺序写，正常情况下不需要手动执行 Wrangler 命令。
 
-**部署后的结果：**
-*   数据库和索引会在首次访问时自动初始化。
-*   首次生产登录前必须设置 `INITIAL_ADMIN_PASSWORD`，否则不会创建默认管理员账号；未初始化时首次访问会返回 503 与设置指引。
-*   生产环境强制要求 `SECRET_KEY`：Deploy to Cloudflare 配置页面会提示填写（部署流程会识别 `.dev.vars.example` 中声明的 Worker secrets）；如果跳过，请求会失败关闭并直接返回设置指引（HTTP 503），详细原因同时记录在 Worker 日志中。
+#### 第 1 步：点击 Deploy to Cloudflare Workers
+
+点击上方按钮并登录 Cloudflare。按照部署页面提示选择你的 Cloudflare 账号，并确认要从本仓库创建 Worker。
+
+Cloudflare 会读取仓库里的 Wrangler 配置，并为项目准备 Worker 及声明的资源。当前项目生产环境需要：
+
+- D1 binding：`DB`
+- KV binding：`RATE_LIMIT_KV`
+- Secret：`SECRET_KEY`
+- Secret：`INITIAL_ADMIN_PASSWORD`
+- 可选 Secret：`PASSWORD_PEPPER`
+
+#### 第 2 步：确认 Worker / D1 / KV 资源
+
+在部署确认页面检查资源列表。正常情况下应看到 Worker，以及由配置声明的 D1、KV 资源。
+
+部署后最终必须满足：
+
+```text
+D1 binding: DB
+KV binding: RATE_LIMIT_KV
+```
+
+如果 Cloudflare 自动创建了 D1 / KV，直接使用它即可；不要把 binding 名称改成别的名字，因为代码按 `DB` 和 `RATE_LIMIT_KV` 访问这些资源。
+
+#### 第 3 步：设置 SECRET_KEY
+
+如果 Deploy 页面直接显示 Secret 输入框，在 `SECRET_KEY` 中填入一个新的随机值。
+
+可以在自己电脑上生成：
+
+```bash
+openssl rand -base64 32
+```
+
+没有 OpenSSL 时：
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+把输出**完整复制**到 `SECRET_KEY`。不要使用 README 示例值，也不要把 Secret 提交到 Git。
+
+#### 第 4 步：设置 INITIAL_ADMIN_PASSWORD
+
+在 `INITIAL_ADMIN_PASSWORD` 中填写你自己设置的管理员初始密码：
+
+- 至少 12 个字符；
+- 不要使用 `12345`、`123456`、`admin` 等弱密码；
+- 建议由密码管理器生成并保存。
+
+也可以生成一个随机值：
+
+```bash
+openssl rand -base64 24
+```
+
+**部署完成后第一次登录就是：**
+
+```text
+用户名：admin
+密码：你这里填写的 INITIAL_ADMIN_PASSWORD
+```
+
+系统只把密码哈希写入 D1，之后无法从数据库反推出这个明文密码，因此请先保存好。
+
+#### 第 5 步：可选设置 PASSWORD_PEPPER
+
+这一步不是启动所必需，但推荐用于增强密码哈希保护。
+
+先生成随机材料：
+
+```bash
+openssl rand -base64 32
+```
+
+然后把 Secret `PASSWORD_PEPPER` 设置成：
+
+```text
+k1:<刚才生成的随机值>
+```
+
+例如：
+
+```text
+k1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=
+```
+
+Pepper 只应保存在 Cloudflare Worker Secrets 和你自己的密码管理器中，**不要写入 D1，也不要提交到 Git**。
+
+#### 第 6 步：点击部署
+
+确认资源和 Secret 后，点击 Cloudflare 部署页面的 **Deploy / Create and deploy**（页面具体按钮文字可能随 Cloudflare UI 更新而略有变化）。
+
+如果部署页面显示 Build / Deploy command，请保留仓库检测到的部署流程。项目的生产部署应使用：
+
+```bash
+npm run deploy
+```
+
+不要把它改成裸的：
+
+```bash
+npx wrangler deploy
+```
+
+因为 `npm run deploy` 会在发布 Worker 之前先应用远程 D1 migrations，避免新代码运行在旧数据库结构上。
+
+#### 第 7 步：如果部署页没有让你填 Secret，部署后到 Dashboard 补上
+
+Cloudflare 当前 Dashboard 的路径是：
+
+```text
+Cloudflare Dashboard
+→ Workers & Pages
+→ 选择刚部署的 Worker
+→ Settings
+→ Variables and Secrets
+→ Add
+```
+
+分别新增：
+
+```text
+Type: Secret
+Variable name: SECRET_KEY
+Value: 你的随机 SECRET_KEY
+```
+
+再新增：
+
+```text
+Type: Secret
+Variable name: INITIAL_ADMIN_PASSWORD
+Value: 你的初始管理员密码（至少 12 位）
+```
+
+如果要启用 pepper，再新增：
+
+```text
+Type: Secret
+Variable name: PASSWORD_PEPPER
+Value: k1:<随机材料>
+```
+
+添加完成后点击 **Deploy**，让新的 Secret 生效。
+
+> Secret 保存后，Cloudflare 不会再显示原始值。请把 `SECRET_KEY`、`INITIAL_ADMIN_PASSWORD`，以及启用时的完整 `PASSWORD_PEPPER` 保存在密码管理器中。
+
+#### 第 8 步：检查 D1 和 KV binding
+
+仍然进入这个 Worker 的 **Settings** 页面，检查绑定资源。
+
+必须确认：
+
+```text
+D1 binding 名称 = DB
+KV binding 名称 = RATE_LIMIT_KV
+```
+
+如果 `RATE_LIMIT_KV` 缺失，网站页面可能能打开，但 `/api/login` 会返回 503，因为项目不会在没有登录限流的情况下开放认证端点。
+
+如果 D1 的 binding 不是 `DB`，应用无法正常读写数据库。
+
+#### 第 9 步：打开 Worker 地址并登录
+
+回到 Worker 的 Overview / Deployments 页面，打开 Cloudflare 提供的 `*.workers.dev` 地址（或你自己绑定的自定义域名）。
+
+登录：
+
+```text
+用户名：admin
+密码：你设置的 INITIAL_ADMIN_PASSWORD
+```
+
+第一次成功登录后，建议进入页面右上角的“设置”，把初始密码改成你长期使用的密码。修改用户名或密码会撤销现有会话，需要用新凭据重新登录。
+
+#### 第 10 步：看到 503 时按提示检查
+
+如果第一次访问出现：
+
+```text
+503 DEPLOYMENT_NOT_INITIALIZED
+```
+
+通常不是程序坏了，而是生产初始化条件还没满足。优先检查：
+
+```text
+Workers & Pages
+→ 你的 Worker
+→ Settings
+→ Variables and Secrets
+```
+
+确认：
+
+- `SECRET_KEY` 已存在；
+- `INITIAL_ADMIN_PASSWORD` 已存在且至少 12 个字符；
+- 然后确认 D1 `DB` 和 KV `RATE_LIMIT_KV` binding 都存在。
+
+### 一键部署完成后的检查清单
+
+部署完成后，对照下面 5 项即可：
+
+- [ ] D1 binding 名称是 `DB`
+- [ ] KV binding 名称是 `RATE_LIMIT_KV`
+- [ ] Secret `SECRET_KEY` 已设置
+- [ ] Secret `INITIAL_ADMIN_PASSWORD` 已设置且至少 12 位
+- [ ] 能用 `admin` + `INITIAL_ADMIN_PASSWORD` 成功登录
+
+#### 一键部署常见问题
+
+| 现象 | 最常见原因 | 处理方法 |
+|---|---|---|
+| 页面返回 `503 DEPLOYMENT_NOT_INITIALIZED` | 缺少 `SECRET_KEY`、缺少 `INITIAL_ADMIN_PASSWORD`，或初始密码不足 12 位 | Worker → Settings → Variables and Secrets → Add，以 `Secret` 类型补齐/修正后点击 Deploy |
+| 页面能打开，但登录接口返回 503 | `RATE_LIMIT_KV` 没有正确绑定或 KV 运行时不可用 | 检查 Worker Settings 中是否存在名为 `RATE_LIMIT_KV` 的 KV binding |
+| 改了 `INITIAL_ADMIN_PASSWORD` 但旧密码仍然有效 | 管理员已经初始化；该 Secret 不是持续同步的“当前密码” | 登录后在“设置”里修改密码；无法登录时按下文“如何重置密码”处理 |
+| 出现 D1 `no such table` / `no such column` | 数据库迁移没有完整应用 | 使用仓库部署链重新执行 `npm run deploy`，必要时先运行 `npm run db:migrate:remote`，再 `npm run verify:remote-migrations` |
+| 登录成功后立即退出 | `SECRET_KEY` 缺失、变化，或浏览器还持有旧 Cookie | 确认 Secret 正确；如刚轮换过 `SECRET_KEY`，清理站点 Cookie 后重新登录 |
 
 ---
 
-### 方法二：使用命令行部署 (适合开发)
+### 方法二：命令行部署（适合开发者 / 自定义部署）
 
-1. **克隆并安装**
-   ```bash
-   git clone https://github.com/WeirdStar0/web-bookmarks.git
-   cd web-bookmarks
-   npm install
-   ```
+命令行部署需要 Node.js 22 和 Wrangler。所有命令都在仓库根目录执行。
 
-2. **初始化数据库**
-   ```bash
-   npx wrangler login
-   npx wrangler d1 create bookmarks-db
-   # 将输出的 database_id 填入 wrangler.toml (必须在 [[d1_databases]] 下填写)
-   npm run check:migrations
-   # 仅对全新或已有正确迁移账本的 D1 数据库应用迁移
-   npm run db:migrate:remote
-   ```
+#### 第 1 步：克隆项目并登录 Cloudflare
 
-3. **设置密钥、初始管理员密码并部署**
-   ```bash
-   npx wrangler secret put SECRET_KEY
-   npx wrangler secret put INITIAL_ADMIN_PASSWORD
-   npm run deploy:check
-   # 自动应用远程迁移后发布,避免新代码运行在旧 schema 上
-   npm run deploy
-   # 部署后确认远程迁移账本完整
-   npm run verify:remote-migrations
-   ```
+```bash
+git clone https://github.com/WeirdStar0/web-bookmarks.git
+cd web-bookmarks
+nvm use
+npm install
+npx wrangler login
+```
+
+#### 第 2 步：创建并绑定 D1
+
+```bash
+npx wrangler d1 create bookmarks-db
+```
+
+把命令返回的 `database_id` 填入 `wrangler.toml` 的：
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "bookmarks-db"
+database_id = "你的-D1-database-id"
+```
+
+`binding` 必须保持为 `DB`，代码和迁移命令都按绑定名访问数据库。
+
+#### 第 3 步：创建并绑定登录限流 KV
+
+```bash
+npx wrangler kv namespace create RATE_LIMIT_KV
+```
+
+把返回的真实 namespace id 填入：
+
+```toml
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "你的-KV-namespace-id"
+```
+
+生产环境必须有这个绑定；项目采用 fail-closed 策略，KV 缺失或不可用时 `/api/login` 返回 503，而不是在没有限流的情况下继续开放登录接口。
+
+#### 第 4 步：设置生产 Secret
+
+先生成 `SECRET_KEY`：
+
+```bash
+openssl rand -base64 32
+```
+
+然后执行：
+
+```bash
+npx wrangler secret put SECRET_KEY
+```
+
+按 Wrangler 提示粘贴刚才生成的值。
+
+再设置首次管理员密码：
+
+```bash
+npx wrangler secret put INITIAL_ADMIN_PASSWORD
+```
+
+输入一个**至少 12 个字符**的强密码。首次初始化后的账号为 `admin`，密码就是这里输入的值。
+
+可选：启用密码 pepper：
+
+```bash
+openssl rand -base64 32
+npx wrangler secret put PASSWORD_PEPPER
+```
+
+给 `PASSWORD_PEPPER` 输入 `k1:<上面生成的随机值>`。
+
+#### 第 5 步：执行检查并部署
+
+```bash
+# 全量质量门：构建、类型检查、lint、测试、迁移文件和部署配置检查
+npm run check
+
+# 单独确认生产绑定和迁移配置
+npm run deploy:check
+
+# 正式部署：先自动应用远程 D1 migrations，再发布 Worker
+npm run deploy
+
+# 部署后确认远程 migration ledger 与仓库一致
+npm run verify:remote-migrations
+```
+
+**不要使用裸的 `npx wrangler deploy` 代替 `npm run deploy`。** 裸命令会绕过本项目在部署脚本里定义的远程 migration 应用步骤。
+
+#### 第 6 步：登录并确认
+
+部署完成后打开 Wrangler 输出的 Worker URL：
+
+```text
+用户名：admin
+密码：INITIAL_ADMIN_PASSWORD 中设置的值
+```
+
+首次登录成功后建议立即在“设置”中更换长期密码。
+
+### 已有部署升级
+
+如果你已经有正在使用的 D1 数据库，**不要重新执行 `schema.sql`、`db:init:remote` 或删除数据库重建**。
+
+正常升级顺序是：
+
+```bash
+git pull
+npm install
+npm run check
+npm run deploy:check
+npm run deploy
+npm run verify:remote-migrations
+```
+
+如果是从很早的版本升级，生产环境还必须确认已经配置：
+
+```bash
+npx wrangler secret put SECRET_KEY
+npx wrangler secret put INITIAL_ADMIN_PASSWORD   # 仅在尚未初始化或检测到历史弱默认密码时需要
+```
+
+如果旧数据库已有业务表，但没有 `d1_migrations` 账本，**不要盲目重放全部迁移**；请先按 [`docs/production-runbook.md`](docs/production-runbook.md) 检查实际 schema 和迁移状态。
 
 ## 🛠️ 本地开发 (Local Development)
 
@@ -395,7 +727,7 @@ ISC License
 
 ## 📞 支持
 
-如有问题,请提交 [Issue](https://github.com/YOUR_USERNAME/web-bookmarks/issues)
+如有问题,请提交 [Issue](https://github.com/WeirdStar0/web-bookmarks/issues)
 
 ---
 

@@ -51,53 +51,385 @@ A modern bookmark management system built on Cloudflare Workers and D1 database.
 
 ## 🚀 Quick Deployment
 
+### Login credentials first
+
+**There is no fixed production default password.** `12345`, `123456`, and `admin` are not valid production defaults in the current version.
+
+After first initialization, sign in with:
+
+- **Username:** `admin`
+- **Password:** the value you set in `INITIAL_ADMIN_PASSWORD` (minimum 12 characters; use a strong, unique password)
+
+`INITIAL_ADMIN_PASSWORD` is used only to **create the initial administrator account** and to replace a historical known weak default credential. Once the administrator has already been initialized, changing this Worker Secret **does not change the current login password**. If you can still sign in, change the long-term password from Settings in the application.
+
+Production also requires:
+
+- `SECRET_KEY`: **required**, used to sign session cookies; generate at least 32 random bytes;
+- `RATE_LIMIT_KV`: **required**, used for login rate limiting;
+- `PASSWORD_PEPPER`: optional but recommended for additional password-hash protection.
+
 ### Option 1: One-Click Deploy (Recommended)
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks)
 
-Click the **Deploy to Cloudflare Workers** button. It will:
-1. Fork/Clone this repo.
-2. Create Worker in Cloudflare.
-3. Automatically create and bind D1 database.
+If your goal is simply to get the application running, **use this method first**. The steps below follow the actual Cloudflare setup flow; in the normal case you do not need to run Wrangler commands manually.
 
-**What happens after deployment:**
-*   Database and indexes are initialized automatically on first visit.
-*   Set `INITIAL_ADMIN_PASSWORD` before the first production login; otherwise no default admin account is created, and first visits receive an actionable 503.
-*   `SECRET_KEY` is mandatory in production: the Deploy to Cloudflare setup page prompts for it (the deploy flow reads Worker secrets declared in `.dev.vars.example`); if skipped, requests fail closed with an actionable 503 message.
+#### Step 1: Open Deploy to Cloudflare Workers
+
+Click the button above and sign in to Cloudflare. Select the Cloudflare account requested by the setup page and confirm that you want to create a Worker from this repository.
+
+Cloudflare reads the Wrangler configuration and prepares the Worker plus declared resources. Production requires:
+
+- D1 binding: `DB`
+- KV binding: `RATE_LIMIT_KV`
+- Secret: `SECRET_KEY`
+- Secret: `INITIAL_ADMIN_PASSWORD`
+- Optional secret: `PASSWORD_PEPPER`
+
+#### Step 2: Confirm the Worker / D1 / KV resources
+
+Review the resource list shown by the deployment flow. A normal setup should include the Worker together with the declared D1 and KV resources.
+
+The final bindings must be:
+
+```text
+D1 binding: DB
+KV binding: RATE_LIMIT_KV
+```
+
+If Cloudflare provisions the D1 database and KV namespace automatically, use those resources. Do not rename the bindings, because the application accesses them as `DB` and `RATE_LIMIT_KV`.
+
+#### Step 3: Set SECRET_KEY
+
+If the Deploy page shows a Secret input, set `SECRET_KEY` to a fresh random value.
+
+Generate one locally with:
+
+```bash
+openssl rand -base64 32
+```
+
+Without OpenSSL:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+```
+
+Copy the **entire output** into `SECRET_KEY`. Do not use a placeholder from the README and do not commit the value to Git.
+
+#### Step 4: Set INITIAL_ADMIN_PASSWORD
+
+Set `INITIAL_ADMIN_PASSWORD` to the password you want to use for the first administrator login:
+
+- minimum 12 characters;
+- do not use `12345`, `123456`, `admin`, or another weak password;
+- preferably generate and store it in a password manager.
+
+You can generate a random value with:
+
+```bash
+openssl rand -base64 24
+```
+
+**Your first production login will be:**
+
+```text
+Username: admin
+Password: the INITIAL_ADMIN_PASSWORD value you entered here
+```
+
+The application stores only a password hash in D1, so it cannot recover this plaintext value later. Save it before continuing.
+
+#### Step 5: Optionally set PASSWORD_PEPPER
+
+This is not required to start the application, but it is recommended for stronger password-hash protection.
+
+Generate random material:
+
+```bash
+openssl rand -base64 32
+```
+
+Then set the `PASSWORD_PEPPER` secret to:
+
+```text
+k1:<the generated random value>
+```
+
+For example:
+
+```text
+k1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=
+```
+
+Keep the complete pepper only in Cloudflare Worker Secrets and your password manager. **Do not store it in D1 or commit it to Git.**
+
+#### Step 6: Deploy
+
+After confirming resources and secrets, click Cloudflare's **Deploy / Create and deploy** action. The exact button label may change slightly as Cloudflare updates the UI.
+
+If the setup page shows a Build / Deploy command, keep the repository-detected deployment flow. Production should use:
+
+```bash
+npm run deploy
+```
+
+Do not replace it with bare:
+
+```bash
+npx wrangler deploy
+```
+
+`npm run deploy` applies remote D1 migrations before publishing the Worker, preventing new code from running against an outdated schema.
+
+#### Step 7: If the Deploy page did not ask for secrets, add them in Dashboard after deployment
+
+Cloudflare's current Dashboard path is:
+
+```text
+Cloudflare Dashboard
+→ Workers & Pages
+→ select the Worker you just deployed
+→ Settings
+→ Variables and Secrets
+→ Add
+```
+
+Add:
+
+```text
+Type: Secret
+Variable name: SECRET_KEY
+Value: your random SECRET_KEY
+```
+
+Then add:
+
+```text
+Type: Secret
+Variable name: INITIAL_ADMIN_PASSWORD
+Value: your initial administrator password (at least 12 characters)
+```
+
+If you want the optional pepper, also add:
+
+```text
+Type: Secret
+Variable name: PASSWORD_PEPPER
+Value: k1:<random material>
+```
+
+Select **Deploy** after adding the secrets so the new values become active.
+
+> Cloudflare does not reveal a secret's original value after it is saved. Keep `SECRET_KEY`, `INITIAL_ADMIN_PASSWORD`, and the full `PASSWORD_PEPPER` (if enabled) in a password manager.
+
+#### Step 8: Verify D1 and KV bindings
+
+Stay on the Worker's **Settings** page and verify its resource bindings.
+
+You must have:
+
+```text
+D1 binding name = DB
+KV binding name = RATE_LIMIT_KV
+```
+
+If `RATE_LIMIT_KV` is missing, the page itself may still load, but `/api/login` returns 503 because this project refuses to expose authentication without login rate limiting.
+
+If the D1 binding is not named `DB`, the application cannot read or write its database correctly.
+
+#### Step 9: Open the Worker URL and sign in
+
+Return to the Worker Overview / Deployments area and open the `*.workers.dev` URL provided by Cloudflare, or your custom domain.
+
+Sign in with:
+
+```text
+Username: admin
+Password: the INITIAL_ADMIN_PASSWORD value you set
+```
+
+After the first successful login, open Settings in the application and change the initial password to your long-term administrator password. Changing the username or password revokes existing sessions, so sign in again with the new credentials.
+
+#### Step 10: If you see 503, check initialization settings first
+
+If the first request returns:
+
+```text
+503 DEPLOYMENT_NOT_INITIALIZED
+```
+
+it usually means the production initialization requirements are incomplete, not that the application is broken.
+
+Start here:
+
+```text
+Workers & Pages
+→ your Worker
+→ Settings
+→ Variables and Secrets
+```
+
+Confirm that:
+
+- `SECRET_KEY` exists;
+- `INITIAL_ADMIN_PASSWORD` exists and has at least 12 characters;
+- then verify that D1 `DB` and KV `RATE_LIMIT_KV` bindings both exist.
+
+### One-click post-deploy checklist
+
+After deployment, verify these five items:
+
+- [ ] D1 binding is named `DB`
+- [ ] KV binding is named `RATE_LIMIT_KV`
+- [ ] `SECRET_KEY` is configured as a Secret
+- [ ] `INITIAL_ADMIN_PASSWORD` is configured and has at least 12 characters
+- [ ] `admin` + `INITIAL_ADMIN_PASSWORD` can sign in successfully
+
+#### One-click deployment troubleshooting
+
+| Symptom | Most likely cause | Fix |
+|---|---|---|
+| Page returns `503 DEPLOYMENT_NOT_INITIALIZED` | `SECRET_KEY` or `INITIAL_ADMIN_PASSWORD` is missing, or the initial password is shorter than 12 characters | Worker → Settings → Variables and Secrets → Add; create/fix the value as type `Secret`, then select Deploy |
+| Page opens but `/api/login` returns 503 | `RATE_LIMIT_KV` is missing or unavailable | Verify that a KV namespace is bound to the Worker as `RATE_LIMIT_KV` |
+| You changed `INITIAL_ADMIN_PASSWORD` but the old login password still works | The administrator is already initialized; this secret is not a continuously synchronized current password | Change the password from Settings, or use the reset procedure below if locked out |
+| D1 reports `no such table` / `no such column` | The migration chain was not fully applied | Deploy through `npm run deploy`; if needed run `npm run db:migrate:remote`, then `npm run verify:remote-migrations` |
+| Login succeeds and immediately expires | `SECRET_KEY` is missing/changed or the browser still has a cookie signed with an older key | Verify the secret; after a key rotation, clear site cookies and sign in again |
 
 ---
 
-### Option 2: CLI Deployment (For Developers)
+### Option 2: CLI Deployment (Developers / Custom Deployments)
 
-1. **Clone and Install**
-   ```bash
-   git clone https://github.com/WeirdStar0/web-bookmarks.git
-   cd web-bookmarks
-   # Use Node.js 22, pinned by .nvmrc
-   nvm use
-   npm install
-   ```
+CLI deployment requires Node.js 22 and Wrangler. Run all commands from the repository root.
 
-2. **Initialize Database**
-   ```bash
-   npx wrangler login
-   npx wrangler d1 create bookmarks-db
-   # Fill database_id into wrangler.toml under [[d1_databases]]
-   npm run check:migrations
-   # Apply the complete migration history only to a fresh or migration-tracked D1 database
-   npm run db:migrate:remote
-   ```
+#### Step 1: Clone and authenticate
 
-3. **Set Secrets and Deploy**
-   ```bash
-   npx wrangler secret put SECRET_KEY
-   npx wrangler secret put INITIAL_ADMIN_PASSWORD
-   # Create RATE_LIMIT_KV, add its id to wrangler.toml, then verify:
-   npm run deploy:check
-   npm run deploy
-   # Confirm the remote migration ledger after deploying
-   npm run verify:remote-migrations
-   ```
+```bash
+git clone https://github.com/WeirdStar0/web-bookmarks.git
+cd web-bookmarks
+nvm use
+npm install
+npx wrangler login
+```
+
+#### Step 2: Create and bind D1
+
+```bash
+npx wrangler d1 create bookmarks-db
+```
+
+Copy the returned `database_id` into `wrangler.toml`:
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "bookmarks-db"
+database_id = "your-D1-database-id"
+```
+
+Keep the binding name exactly `DB`; the code and migration commands access the database through that binding.
+
+#### Step 3: Create and bind the login rate-limit KV namespace
+
+```bash
+npx wrangler kv namespace create RATE_LIMIT_KV
+```
+
+Copy the returned namespace id into:
+
+```toml
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "your-KV-namespace-id"
+```
+
+This binding is mandatory in production. The project fails closed: when the KV binding is missing or unavailable, `/api/login` returns 503 rather than exposing an un-rate-limited login endpoint.
+
+#### Step 4: Configure production secrets
+
+Generate `SECRET_KEY`:
+
+```bash
+openssl rand -base64 32
+```
+
+Then run:
+
+```bash
+npx wrangler secret put SECRET_KEY
+```
+
+Paste the generated value when Wrangler prompts for it.
+
+Set the initial administrator password:
+
+```bash
+npx wrangler secret put INITIAL_ADMIN_PASSWORD
+```
+
+Enter a strong password with **at least 12 characters**. The first initialized account is `admin`, and its password is the value entered here.
+
+Optional: enable a password pepper:
+
+```bash
+openssl rand -base64 32
+npx wrangler secret put PASSWORD_PEPPER
+```
+
+Enter `k1:<the generated random value>` for `PASSWORD_PEPPER`.
+
+#### Step 5: Check and deploy
+
+```bash
+# Full quality gate: build, typecheck, lint, tests, migration and deploy-config checks
+npm run check
+
+# Verify production bindings and migration configuration
+npm run deploy:check
+
+# Production deploy: apply remote D1 migrations first, then publish the Worker
+npm run deploy
+
+# Confirm the remote migration ledger matches this repository
+npm run verify:remote-migrations
+```
+
+**Do not replace `npm run deploy` with bare `npx wrangler deploy`.** The bare command bypasses this repository's remote migration application step.
+
+#### Step 6: Sign in
+
+Open the Worker URL printed by Wrangler:
+
+```text
+Username: admin
+Password: the value stored in INITIAL_ADMIN_PASSWORD
+```
+
+After the first successful login, change the administrator password from Settings.
+
+### Upgrading an existing deployment
+
+If you already have a D1 database containing application data, **do not re-run `schema.sql`, `db:init:remote`, or recreate the database**.
+
+Normal upgrade sequence:
+
+```bash
+git pull
+npm install
+npm run check
+npm run deploy:check
+npm run deploy
+npm run verify:remote-migrations
+```
+
+For upgrades from older releases, production must also have:
+
+```bash
+npx wrangler secret put SECRET_KEY
+npx wrangler secret put INITIAL_ADMIN_PASSWORD   # only if not initialized yet or a legacy weak default is detected
+```
+
+If an old production database already contains the application tables but has no `d1_migrations` ledger, **do not blindly replay the entire migration history**. Inspect the real schema and follow [`docs/production-runbook.md`](docs/production-runbook.md) first.
 
 ## 🛠️ Local Development
 
@@ -316,4 +648,3 @@ Submit an [Issue](https://github.com/WeirdStar0/web-bookmarks/issues)
 
 ---
 ⭐ Give it a Star if it helped!
-
