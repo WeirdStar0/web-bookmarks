@@ -1,5 +1,5 @@
 name = "web-bookmarks"
-compatibility_date = "2025-11-21"
+compatibility_date = "2026-09-10"
 main = "src/index.ts"
 
 [observability]
