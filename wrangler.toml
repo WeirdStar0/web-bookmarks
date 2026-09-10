@@ -4,18 +4,19 @@ main = "src/index.ts"
 
 [observability]
 enabled = true
+# Wrangler 4.130.0 accepts this setting. Keep it enabled before restoring
+# invocation logs or traces so request query strings are redacted at ingestion.
+redact_query_string = true
 
 [observability.logs]
 enabled = true
-# The repository currently locks Wrangler 4.56.0, which does not understand
-# observability.redact_query_string. Keep invocation logs off so search query
-# strings cannot be persisted in request URLs. Custom console logs remain on.
+# Keep invocation logs disabled in this toolchain-only change. They can be
+# restored separately after CI confirms the upgraded Wrangler parses redaction.
 invocation_logs = false
 head_sampling_rate = 1
 
 [observability.traces]
-# Traces can also contain request URLs. Re-enable only after Wrangler is upgraded
-# to a release that accepts observability.redact_query_string and CI confirms it.
+# Keep traces disabled until the toolchain upgrade is independently verified.
 enabled = false
 
 # 环境变量 - 在 Cloudflare Dashboard 中配置这些变量
