@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 
 const ADMIN_PASSWORD = 'local-development-only';
+const EXPECTED_PRELOGIN_401 = 'Failed to load resource: the server responded with a status of 401 (Unauthorized)';
 
 function alpineClick(page, expression) {
     return page.locator(`button[\\@click="${expression}"]`).first();
@@ -9,10 +10,14 @@ function alpineClick(page, expression) {
 test('critical browser journey works without Alpine or CSP errors', async ({ page }) => {
     const pageErrors = [];
     const consoleErrors = [];
+    let signedIn = false;
 
     page.on('pageerror', (error) => pageErrors.push(error.message));
     page.on('console', (message) => {
-        if (message.type() === 'error') consoleErrors.push(message.text());
+        if (message.type() !== 'error') return;
+        const text = message.text();
+        if (!signedIn && text === EXPECTED_PRELOGIN_401) return;
+        consoleErrors.push(text);
     });
 
     await page.addInitScript(() => {
@@ -33,6 +38,7 @@ test('critical browser journey works without Alpine or CSP errors', async ({ pag
     await page.locator('#loginUsername').locator('xpath=ancestor::form').locator('button[type="submit"]').click();
 
     await expect(page.locator('[x-show="loggedIn"]')).toBeVisible();
+    signedIn = true;
 
     // Exercise method calls, modal state, writes, and x-for rendering.
     await alpineClick(page, 'openFolderModal()').click();
@@ -68,5 +74,5 @@ test('critical browser journey works without Alpine or CSP errors', async ({ pag
     const cspViolations = await page.evaluate(() => window.__cspViolations);
     expect(cspViolations, 'CSP violations').toEqual([]);
     expect(pageErrors, 'uncaught browser errors').toEqual([]);
-    expect(consoleErrors, 'browser console errors').toEqual([]);
+    expect(consoleErrors, 'unexpected browser console errors').toEqual([]);
 });
