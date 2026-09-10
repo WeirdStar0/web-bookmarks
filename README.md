@@ -74,102 +74,224 @@
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/target?url=https://github.com/WeirdStar0/web-bookmarks)
 
-Cloudflare 的 Deploy to Workers 流程会复制仓库、构建 Worker，并根据 Wrangler 配置自动创建/绑定支持的资源（包括 D1 和 KV）。部署页面也会读取 `.dev.vars.example` 中声明的 secrets，让你在发布前填写所需值。
+如果你只是想把项目部署起来使用，**优先选这一种**。下面按实际操作顺序写，正常情况下不需要手动执行 Wrangler 命令。
 
-#### 第 1 步：点击部署按钮
+#### 第 1 步：点击 Deploy to Cloudflare Workers
 
-点击上方 **Deploy to Cloudflare Workers**，登录 Cloudflare，并按页面提示选择账号、仓库名称和 Worker 名称。
+点击上方按钮并登录 Cloudflare。按照部署页面提示选择你的 Cloudflare 账号，并确认要从本仓库创建 Worker。
 
-正常情况下，部署流程会为项目准备：
+Cloudflare 会读取仓库里的 Wrangler 配置，并为项目准备 Worker 及声明的资源。当前项目生产环境需要：
 
-- D1 数据库绑定：`DB`
-- KV 命名空间绑定：`RATE_LIMIT_KV`
-- Worker 本体
+- D1 binding：`DB`
+- KV binding：`RATE_LIMIT_KV`
+- Secret：`SECRET_KEY`
+- Secret：`INITIAL_ADMIN_PASSWORD`
+- 可选 Secret：`PASSWORD_PEPPER`
 
-如果页面提供 Build / Deploy command，请保持仓库检测到的部署脚本，**生产发布必须走 `npm run deploy`**。不要把部署命令改成裸的 `npx wrangler deploy`，因为本项目的 `npm run deploy` 会先应用远程 D1 migrations，再发布 Worker，避免新代码运行在旧数据库结构上。
+#### 第 2 步：确认 Worker / D1 / KV 资源
 
-#### 第 2 步：填写两个必需 Secret
+在部署确认页面检查资源列表。正常情况下应看到 Worker，以及由配置声明的 D1、KV 资源。
 
-部署页面提示填写 secret 时，至少配置下面两个：
+部署后最终必须满足：
 
-**`SECRET_KEY`**
+```text
+D1 binding: DB
+KV binding: RATE_LIMIT_KV
+```
 
-用于签名会话 Cookie。请生成新的随机值，不要直接使用示例字符串：
+如果 Cloudflare 自动创建了 D1 / KV，直接使用它即可；不要把 binding 名称改成别的名字，因为代码按 `DB` 和 `RATE_LIMIT_KV` 访问这些资源。
+
+#### 第 3 步：设置 SECRET_KEY
+
+如果 Deploy 页面直接显示 Secret 输入框，在 `SECRET_KEY` 中填入一个新的随机值。
+
+可以在自己电脑上生成：
 
 ```bash
 openssl rand -base64 32
 ```
 
-没有 OpenSSL 时也可以使用 Node.js：
+没有 OpenSSL 时：
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 ```
 
-把输出完整填入 `SECRET_KEY`。
+把输出**完整复制**到 `SECRET_KEY`。不要使用 README 示例值，也不要把 Secret 提交到 Git。
 
-**`INITIAL_ADMIN_PASSWORD`**
+#### 第 4 步：设置 INITIAL_ADMIN_PASSWORD
 
-这是你第一次登录 `admin` 账号时使用的密码：
+在 `INITIAL_ADMIN_PASSWORD` 中填写你自己设置的管理员初始密码：
 
 - 至少 12 个字符；
-- 不要填写 `12345`、`123456`、`admin` 等弱密码；
-- 建议使用密码管理器生成并保存。
+- 不要使用 `12345`、`123456`、`admin` 等弱密码；
+- 建议由密码管理器生成并保存。
 
-例如自己生成一条随机初始密码：
+也可以生成一个随机值：
 
 ```bash
 openssl rand -base64 24
 ```
 
-> 请保存好这个值。系统数据库只保存密码哈希，无法从 D1 中反推出你的明文密码。
-
-#### 第 3 步：可选配置 PASSWORD_PEPPER
-
-如果希望进一步保护密码哈希，可以同时配置 `PASSWORD_PEPPER`。格式必须是：
+**部署完成后第一次登录就是：**
 
 ```text
-k1:<随机材料>
+用户名：admin
+密码：你这里填写的 INITIAL_ADMIN_PASSWORD
 ```
 
-随机材料可生成：
+系统只把密码哈希写入 D1，之后无法从数据库反推出这个明文密码，因此请先保存好。
+
+#### 第 5 步：可选设置 PASSWORD_PEPPER
+
+这一步不是启动所必需，但推荐用于增强密码哈希保护。
+
+先生成随机材料：
 
 ```bash
 openssl rand -base64 32
 ```
 
-然后把 `k1:` 和输出拼起来，例如 `k1:xxxxxx...`。Pepper 只应保存在 Worker Secrets / 密码管理器中，**不要写入数据库，也不要提交到 Git**。
+然后把 Secret `PASSWORD_PEPPER` 设置成：
 
-不配置 `PASSWORD_PEPPER` 也可以正常使用，系统会继续使用 v3 密码哈希格式。
+```text
+k1:<刚才生成的随机值>
+```
 
-#### 第 4 步：完成部署并检查绑定
+例如：
 
-部署完成后，在 Cloudflare Dashboard 打开该 Worker，检查 **Settings / Bindings（或 Variables and Secrets）**：
+```text
+k1:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=
+```
 
-- D1 binding 名称必须是 `DB`；
-- KV binding 名称必须是 `RATE_LIMIT_KV`；
-- Secrets 中应存在 `SECRET_KEY`；
-- Secrets 中应存在 `INITIAL_ADMIN_PASSWORD`。
+Pepper 只应保存在 Cloudflare Worker Secrets 和你自己的密码管理器中，**不要写入 D1，也不要提交到 Git**。
 
-正常生产部署会通过 `npm run deploy` 在 Worker 发布前应用 D1 migration。应用本身仍保留空数据库的运行时初始化兜底，但**不要把“首次访问自动建库”当成生产部署流程**。
+#### 第 6 步：点击部署
 
-#### 第 5 步：首次登录
+确认资源和 Secret 后，点击 Cloudflare 部署页面的 **Deploy / Create and deploy**（页面具体按钮文字可能随 Cloudflare UI 更新而略有变化）。
 
-打开 Cloudflare 提供的 `*.workers.dev` 地址或你绑定的自定义域名：
+如果部署页面显示 Build / Deploy command，请保留仓库检测到的部署流程。项目的生产部署应使用：
+
+```bash
+npm run deploy
+```
+
+不要把它改成裸的：
+
+```bash
+npx wrangler deploy
+```
+
+因为 `npm run deploy` 会在发布 Worker 之前先应用远程 D1 migrations，避免新代码运行在旧数据库结构上。
+
+#### 第 7 步：如果部署页没有让你填 Secret，部署后到 Dashboard 补上
+
+Cloudflare 当前 Dashboard 的路径是：
+
+```text
+Cloudflare Dashboard
+→ Workers & Pages
+→ 选择刚部署的 Worker
+→ Settings
+→ Variables and Secrets
+→ Add
+```
+
+分别新增：
+
+```text
+Type: Secret
+Variable name: SECRET_KEY
+Value: 你的随机 SECRET_KEY
+```
+
+再新增：
+
+```text
+Type: Secret
+Variable name: INITIAL_ADMIN_PASSWORD
+Value: 你的初始管理员密码（至少 12 位）
+```
+
+如果要启用 pepper，再新增：
+
+```text
+Type: Secret
+Variable name: PASSWORD_PEPPER
+Value: k1:<随机材料>
+```
+
+添加完成后点击 **Deploy**，让新的 Secret 生效。
+
+> Secret 保存后，Cloudflare 不会再显示原始值。请把 `SECRET_KEY`、`INITIAL_ADMIN_PASSWORD`，以及启用时的完整 `PASSWORD_PEPPER` 保存在密码管理器中。
+
+#### 第 8 步：检查 D1 和 KV binding
+
+仍然进入这个 Worker 的 **Settings** 页面，检查绑定资源。
+
+必须确认：
+
+```text
+D1 binding 名称 = DB
+KV binding 名称 = RATE_LIMIT_KV
+```
+
+如果 `RATE_LIMIT_KV` 缺失，网站页面可能能打开，但 `/api/login` 会返回 503，因为项目不会在没有登录限流的情况下开放认证端点。
+
+如果 D1 的 binding 不是 `DB`，应用无法正常读写数据库。
+
+#### 第 9 步：打开 Worker 地址并登录
+
+回到 Worker 的 Overview / Deployments 页面，打开 Cloudflare 提供的 `*.workers.dev` 地址（或你自己绑定的自定义域名）。
+
+登录：
 
 ```text
 用户名：admin
-密码：你刚才设置的 INITIAL_ADMIN_PASSWORD
+密码：你设置的 INITIAL_ADMIN_PASSWORD
 ```
 
-首次成功登录后，建议立即进入“设置”把初始密码改成长期使用的密码。修改用户名或密码会撤销已有会话，需要使用新凭据重新登录。
+第一次成功登录后，建议进入页面右上角的“设置”，把初始密码改成你长期使用的密码。修改用户名或密码会撤销现有会话，需要用新凭据重新登录。
+
+#### 第 10 步：看到 503 时按提示检查
+
+如果第一次访问出现：
+
+```text
+503 DEPLOYMENT_NOT_INITIALIZED
+```
+
+通常不是程序坏了，而是生产初始化条件还没满足。优先检查：
+
+```text
+Workers & Pages
+→ 你的 Worker
+→ Settings
+→ Variables and Secrets
+```
+
+确认：
+
+- `SECRET_KEY` 已存在；
+- `INITIAL_ADMIN_PASSWORD` 已存在且至少 12 个字符；
+- 然后确认 D1 `DB` 和 KV `RATE_LIMIT_KV` binding 都存在。
+
+### 一键部署完成后的检查清单
+
+部署完成后，对照下面 5 项即可：
+
+- [ ] D1 binding 名称是 `DB`
+- [ ] KV binding 名称是 `RATE_LIMIT_KV`
+- [ ] Secret `SECRET_KEY` 已设置
+- [ ] Secret `INITIAL_ADMIN_PASSWORD` 已设置且至少 12 位
+- [ ] 能用 `admin` + `INITIAL_ADMIN_PASSWORD` 成功登录
 
 #### 一键部署常见问题
 
 | 现象 | 最常见原因 | 处理方法 |
 |---|---|---|
-| 页面返回 `503 DEPLOYMENT_NOT_INITIALIZED` | 缺少 `SECRET_KEY`、缺少 `INITIAL_ADMIN_PASSWORD`，或初始密码不足 12 位 | 到 Worker → Settings → Variables and Secrets 补齐/修正 Secret，然后重新访问 |
-| 页面能打开，但登录接口返回 503 | `RATE_LIMIT_KV` 没有正确绑定或 KV 运行时不可用 | 检查 Worker Bindings 中是否存在名为 `RATE_LIMIT_KV` 的 KV namespace |
+| 页面返回 `503 DEPLOYMENT_NOT_INITIALIZED` | 缺少 `SECRET_KEY`、缺少 `INITIAL_ADMIN_PASSWORD`，或初始密码不足 12 位 | Worker → Settings → Variables and Secrets → Add，以 `Secret` 类型补齐/修正后点击 Deploy |
+| 页面能打开，但登录接口返回 503 | `RATE_LIMIT_KV` 没有正确绑定或 KV 运行时不可用 | 检查 Worker Settings 中是否存在名为 `RATE_LIMIT_KV` 的 KV binding |
 | 改了 `INITIAL_ADMIN_PASSWORD` 但旧密码仍然有效 | 管理员已经初始化；该 Secret 不是持续同步的“当前密码” | 登录后在“设置”里修改密码；无法登录时按下文“如何重置密码”处理 |
 | 出现 D1 `no such table` / `no such column` | 数据库迁移没有完整应用 | 使用仓库部署链重新执行 `npm run deploy`，必要时先运行 `npm run db:migrate:remote`，再 `npm run verify:remote-migrations` |
 | 登录成功后立即退出 | `SECRET_KEY` 缺失、变化，或浏览器还持有旧 Cookie | 确认 Secret 正确；如刚轮换过 `SECRET_KEY`，清理站点 Cookie 后重新登录 |
