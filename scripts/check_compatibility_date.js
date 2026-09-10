@@ -52,13 +52,13 @@ function main() {
     const repoRoot = path.resolve(__dirname, '..');
     const wranglerPath = path.join(repoRoot, 'wrangler.toml');
     const wrangler = fs.readFileSync(wranglerPath, 'utf8');
-    const match = wrangler.match(/^compatibility_date\s*=\s*"(\d{4}-\d{2}-\d{2})"\s*$/m);
+    const matches = [...wrangler.matchAll(/^compatibility_date\s*=\s*"(\d{4}-\d{2}-\d{2})"\s*$/gm)];
 
-    if (!match) {
-        throw new Error('wrangler.toml must contain exactly one YYYY-MM-DD compatibility_date');
+    if (matches.length !== 1) {
+        throw new Error(`wrangler.toml must contain exactly one YYYY-MM-DD compatibility_date; found ${matches.length}`);
     }
 
-    const configuredValue = match[1];
+    const configuredValue = matches[0][1];
     const configuredDate = parseDateOnly(configuredValue, 'compatibility_date');
     const reference = parseDateOnly(referenceDate, 'reference date');
     const ageDays = Math.floor((reference.getTime() - configuredDate.getTime()) / DAY_MS);
