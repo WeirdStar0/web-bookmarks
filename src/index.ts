@@ -22,7 +22,7 @@ import { it } from './locales/it';
 import { csrf } from 'hono/csrf';
 import type { HTTPException } from 'hono/http-exception';
 import { err, ErrCode, getConfig, DeploymentSetupError } from './utils/common';
-import { apiRequestLogMiddleware, logRequestError } from './utils/observability';
+import { logRequestError } from './utils/observability';
 import type { TemplateTranslations } from './templates/types';
 import { appAssetSource } from './templates/appAsset';
 import { appCssAssetSource } from './templates/appCssAsset';
@@ -57,9 +57,9 @@ function isAllowedRequestOrigin(origin: string, requestOrigin: string, allowedEx
     return false;
 }
 
-// Persist one structured log for API responses. This intentionally records
-// pathname only: search terms and other query parameters must not reach logs.
-app.use('/api/*', apiRequestLogMiddleware);
+// Request method/path/status/CPU/wall-time are already captured by Cloudflare
+// invocation logs. Avoid duplicating one custom log per request; custom logs
+// below are reserved for errors and D1 route-level performance summaries.
 app.use('*', csrf({
     origin: (origin, c) => {
         const config = getConfig(c.env);
