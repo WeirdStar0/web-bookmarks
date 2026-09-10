@@ -727,7 +727,7 @@ ISC License
 
 ## 📞 支持
 
-如有问题,请提交 [Issue](https://github.com/YOUR_USERNAME/web-bookmarks/issues)
+如有问题,请提交 [Issue](https://github.com/WeirdStar0/web-bookmarks/issues)
 
 ---
 
