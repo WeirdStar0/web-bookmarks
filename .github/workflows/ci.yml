@@ -40,6 +40,40 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high --registry=https://registry.npmjs.org
 
+  browser-smoke:
+    name: Browser smoke (Chromium)
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Install pinned Playwright runner
+        run: npm install --no-save --package-lock=false @playwright/test@1.63.0
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare local E2E secrets
+        run: |
+          cat > .dev.vars <<'EOF'
+          SECRET_KEY=ci-e2e-session-secret-0123456789abcdef
+          INITIAL_ADMIN_PASSWORD=ci-e2e-password-123
+          EOF
+
+      - name: Run browser smoke test
+        run: npx playwright test --config=playwright.config.cjs
+
   production-config:
     name: Verify production deployment configuration
     if: github.event_name == 'workflow_dispatch'
