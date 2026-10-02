@@ -278,13 +278,23 @@ Workers & Pages
 
 ### 一键部署完成后的检查清单
 
-部署完成后，对照下面 5 项即可：
+部署完成后，对照下面 6 项即可：
 
 - [ ] D1 binding 名称是 `DB`
 - [ ] KV binding 名称是 `RATE_LIMIT_KV`
 - [ ] Secret `SECRET_KEY` 已设置
 - [ ] Secret `INITIAL_ADMIN_PASSWORD` 已设置且至少 12 位
 - [ ] 能用 `admin` + `INITIAL_ADMIN_PASSWORD` 成功登录
+- [ ] 设置了 `PASSWORD_PEPPER` 的，登录后确认哈希确实升级为 v4（见下）
+
+最后一项无法从网页判断，只能查库或运行 `npm run verify:remote-pepper`（需克隆仓库并登录 Cloudflare）。用 Dashboard 的话，在 D1 控制台执行：
+
+```sql
+SELECT CASE WHEN value LIKE 'v4:%' THEN '已受保护' ELSE '未生效' END AS state
+FROM settings WHERE key = 'password';
+```
+
+不要直接查看 `value`——那是哈希本身。
 
 #### 一键部署常见问题
 
@@ -295,12 +305,13 @@ Workers & Pages
 | 改了 `INITIAL_ADMIN_PASSWORD` 但旧密码仍然有效 | 管理员已经初始化；该 Secret 不是持续同步的“当前密码” | 登录后在“设置”里修改密码；无法登录时按下文“如何重置密码”处理 |
 | 出现 D1 `no such table` / `no such column` | 数据库迁移没有完整应用 | 使用仓库部署链重新执行 `npm run deploy`，必要时先运行 `npm run db:migrate:remote`，再 `npm run verify:remote-migrations` |
 | 登录成功后立即退出 | `SECRET_KEY` 缺失、变化，或浏览器还持有旧 Cookie | 确认 Secret 正确；如刚轮换过 `SECRET_KEY`，清理站点 Cookie 后重新登录 |
+| 登录正常，但不确定 `PASSWORD_PEPPER` 是否真的生效 | 哈希迁移是静默失败的，登录 200 不代表哈希已升级 | 运行 `npm run verify:remote-pepper`；若报告 `HALF-ENABLED`，退出登录再登录一次后重跑 |
 
 ---
 
 ### 方法二：命令行部署（适合开发者 / 自定义部署）
 
-命令行部署需要 Node.js 22 和 Wrangler。所有命令都在仓库根目录执行。
+命令行部署需要 Node.js 22 和 Wrangler。所有命令都在仓库根目录执行——在仓库外运行 `npx wrangler` 会现下载最新版 Wrangler，既读不到本项目的 `wrangler.toml`，也与仓库锁定的版本行为不一致。
 
 #### 第 1 步：克隆项目并登录 Cloudflare
 
@@ -512,7 +523,7 @@ npm run db:migrate:remote
 1. 创建 KV 命名空间：`npx wrangler kv namespace create RATE_LIMIT_KV`
 2. 将返回的真实 `id` 填入 `wrangler.toml` 中启用的 `[[kv_namespaces]]` 配置块。
 3. 使用 `npx wrangler secret put SECRET_KEY` 和 `npx wrangler secret put INITIAL_ADMIN_PASSWORD` 设置生产密钥；`SECRET_KEY` 为生产强制项，未设置时服务会失败关闭。
-4. 运行 `npm run deploy:check` 确认迁移文件与生产绑定配置通过，执行 `npm run deploy`（先自动应用远程迁移再发布）后用 `npm run verify:remote-migrations` 复核远程迁移账本。不要直接运行 `npx wrangler deploy`，那会跳过迁移应用。
+4. 运行 `npm run deploy:check` 确认迁移文件与生产绑定配置通过，执行 `npm run deploy`（先自动应用远程迁移再发布），再用 `npm run verify:remote-migrations` 复核远程迁移账本；设置了 pepper 的再加跑 `npm run verify:remote-pepper` 确认哈希已升级为 v4。不要直接运行 `npx wrangler deploy`，那会跳过迁移应用。
 
 若未完成绑定，或者已绑定的 KV 在运行时读写失败，`/api/login` 都会返回 `503`；这能避免限流不可用时登录端点退化为可暴力破解状态。部署前检查同样会阻止未绑定 KV 的发布。
 
@@ -539,6 +550,14 @@ npx wrangler secret put PASSWORD_PEPPER   # 填入 k1:<上面的输出>
 ```
 
 设置后，下一次成功登录会把现有口令哈希自动迁移到 v4；改密和初始化管理员也会直接产出 v4。未设置 pepper 时系统照常工作（v3、默认 25,000 迭代），因此这是推荐项而非强制项。
+
+⚠️ **登录成功不等于哈希已升级。** pepper 只在下一次成功登录时才生效，而那次迁移写入是**静默失败**的（设计上保证正确口令永不被迁移失败拒绝），所以"配了 pepper、登录返回 200、哈希其实还是 v3"是真实存在的状态，此时 D1 泄露仍可离线爆破。首次启用和轮换后都必须复查：
+
+```bash
+npm run verify:remote-pepper
+```
+
+它只读远端状态，报告 `v4` 即已受保护；若报告 `HALF-ENABLED`，退出登录再登录一次后重跑。该命令需要 Cloudflare 凭据（`npx wrangler whoami` 或 `CLOUDFLARE_API_TOKEN`），因此不在 `npm run check` 内。四种状态的完整判读见 [`docs/production-runbook.md`](docs/production-runbook.md)。
 
 **轮换**（顺序很重要——`wrangler secret put` 会立即部署新版本，且 secret 设置后不可再读回）：先把当前完整 pepper 值存入密码管理器，再把旧完整值设为 `PASSWORD_PEPPER_PREVIOUS`，然后把新 id（如 `k2:<新的随机串>`）设为 `PASSWORD_PEPPER`；下一次成功登录触发重哈希。删除 `PASSWORD_PEPPER_PREVIOUS` 前，先确认迁移确实落库（迁移写入可能静默失败）：只查询 `settings.password` 是否已引用新 id（布尔查询见 runbook），确认后再删除。切勿复用 id，也不要在保留 id 的前提下更换 material。**丢失 pepper** 时对应哈希无法校验、登录失败关闭，唯一恢复途径是既有重置流程（删除 settings 表的 `password` 记录后按 `INITIAL_ADMIN_PASSWORD` 重新初始化）。详见 [`docs/password-v4-design.md`](docs/password-v4-design.md)。
 

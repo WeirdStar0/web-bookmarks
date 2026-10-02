@@ -278,13 +278,23 @@ Confirm that:
 
 ### One-click post-deploy checklist
 
-After deployment, verify these five items:
+After deployment, verify these six items:
 
 - [ ] D1 binding is named `DB`
 - [ ] KV binding is named `RATE_LIMIT_KV`
 - [ ] `SECRET_KEY` is configured as a Secret
 - [ ] `INITIAL_ADMIN_PASSWORD` is configured and has at least 12 characters
 - [ ] `admin` + `INITIAL_ADMIN_PASSWORD` can sign in successfully
+- [ ] If `PASSWORD_PEPPER` is set, the stored hash actually became v4 (see below)
+
+The last item cannot be judged from the page. Either run `npm run verify:remote-pepper` (requires a local clone and a Cloudflare login) or, from the D1 console in the Dashboard:
+
+```sql
+SELECT CASE WHEN value LIKE 'v4:%' THEN 'protected' ELSE 'not effective' END AS state
+FROM settings WHERE key = 'password';
+```
+
+Never inspect `value` directly — that is the hash itself.
 
 #### One-click deployment troubleshooting
 
@@ -295,12 +305,13 @@ After deployment, verify these five items:
 | You changed `INITIAL_ADMIN_PASSWORD` but the old login password still works | The administrator is already initialized; this secret is not a continuously synchronized current password | Change the password from Settings, or use the reset procedure below if locked out |
 | D1 reports `no such table` / `no such column` | The migration chain was not fully applied | Deploy through `npm run deploy`; if needed run `npm run db:migrate:remote`, then `npm run verify:remote-migrations` |
 | Login succeeds and immediately expires | `SECRET_KEY` is missing/changed or the browser still has a cookie signed with an older key | Verify the secret; after a key rotation, clear site cookies and sign in again |
+| Login works, but you are unsure whether `PASSWORD_PEPPER` actually took effect | The hash migration fails silently, so a 200 login does not mean the hash was upgraded | Run `npm run verify:remote-pepper`; if it reports `HALF-ENABLED`, sign out, sign in once, and run it again |
 
 ---
 
 ### Option 2: CLI Deployment (Developers / Custom Deployments)
 
-CLI deployment requires Node.js 22 and Wrangler. Run all commands from the repository root.
+CLI deployment requires Node.js 22 and Wrangler. Run all commands from the repository root — running `npx wrangler` elsewhere downloads the latest Wrangler, which cannot read this project's `wrangler.toml` and behaves differently from the version the repository pins.
 
 #### Step 1: Clone and authenticate
 
@@ -502,7 +513,7 @@ Use `npm run check` as the pre-commit and pre-deploy quality gate. It runs asset
 1. Create KV: `npx wrangler kv namespace create RATE_LIMIT_KV`.
 2. Add the returned real namespace ID to the active `[[kv_namespaces]]` block in `wrangler.toml`.
 3. Set production secrets with `npx wrangler secret put SECRET_KEY` and `npx wrangler secret put INITIAL_ADMIN_PASSWORD`; `SECRET_KEY` is mandatory in production and the service fails closed without it.
-4. Run `npm run deploy:check` (local migration-file and production-binding checks), deploy with `npm run deploy` (applies pending remote migrations before publishing), then confirm the remote migration ledger with `npm run verify:remote-migrations`. Do not deploy with bare `npx wrangler deploy`; it skips migration application.
+4. Run `npm run deploy:check` (local migration-file and production-binding checks), deploy with `npm run deploy` (applies pending remote migrations before publishing), then confirm the remote migration ledger with `npm run verify:remote-migrations`. If a pepper is set, also run `npm run verify:remote-pepper` to confirm the stored hash became v4. Do not deploy with bare `npx wrangler deploy`; it skips migration application.
 
 Without this binding, or when the bound KV fails at runtime, `/api/login` fails closed with `503`; this prevents the login endpoint from degrading into an unprotected brute-force target. The pre-deploy check also blocks publication when the KV binding is absent.
 
@@ -529,6 +540,14 @@ npx wrangler secret put PASSWORD_PEPPER   # enter k1:<the output>
 ```
 
 The next successful login migrates the stored hash to v4 automatically; password changes and initial admin creation produce v4 directly. Without a pepper the system keeps working (v3, the default 25,000 iterations), so this is recommended rather than required.
+
+⚠️ **A successful login does not mean the hash was upgraded.** The pepper only takes effect on the next successful login, and that migration write fails **silently** by design (so a correct password is never rejected because a migration failed). "Pepper configured, login returned 200, hash still v3" is therefore a real state, and while it holds a D1 leak can still be cracked offline. Verify after both a first-time setup and every rotation:
+
+```bash
+npm run verify:remote-pepper
+```
+
+It only reads remote state and reports `v4` once the hash is protected; if it reports `HALF-ENABLED`, sign out, sign in once, and run it again. It needs Cloudflare credentials (`npx wrangler whoami` or `CLOUDFLARE_API_TOKEN`), which is why it is not part of `npm run check`. See [`docs/production-runbook.md`](docs/production-runbook.md) for the full four-state table.
 
 **Rotation** (order matters — `wrangler secret put` deploys immediately, and secret values cannot be read back later): keep the current full pepper in a password manager, write the old full value into `PASSWORD_PEPPER_PREVIOUS`, then the new id (e.g. `k2:<fresh random material>`) into `PASSWORD_PEPPER`, and log in once to trigger the re-hash. Before removing `PASSWORD_PEPPER_PREVIOUS`, confirm the stored hash actually references the new id — the migration write fails silently, so run the boolean-only D1 query documented in the runbook first. Never reuse an id and never change the material while keeping an id. **Losing the pepper** makes the corresponding hash unverifiable and login fails closed; the only recovery is the documented reset path (delete the `password` row in `settings`, then re-initialize with `INITIAL_ADMIN_PASSWORD`). See [`docs/password-v4-design.md`](docs/password-v4-design.md).
 
