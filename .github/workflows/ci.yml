@@ -92,3 +92,6 @@ jobs:
 
       - name: Check required production bindings
         run: npm run deploy:check
+
+      - name: Verify remote password pepper state
+        run: npm run verify:remote-pepper

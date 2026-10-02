@@ -44,6 +44,14 @@ preview_id = "preview-namespace-id"
     assert.doesNotMatch(packageJson.scripts['deploy:check'], /check_remote_d1_migrations/, 'deploy:check must not require remote D1 migrations before first deploy');
     assert.match(packageJson.scripts['verify:remote-migrations'], /check_remote_d1_migrations/, 'verify:remote-migrations must run the remote ledger check');
 
+    // The pepper check reads remote state, so it must stay out of the
+    // local-only pre-deploy gate for the same reason the migration check is:
+    // a first deployment must not be blocked by a secret that does not exist
+    // yet. It is reachable only as an explicit post-deploy verification.
+    assert.match(packageJson.scripts['verify:remote-pepper'], /check_remote_password_pepper/, 'verify:remote-pepper must run the remote pepper check');
+    assert.doesNotMatch(packageJson.scripts['deploy:check'], /check_remote_password_pepper/, 'deploy:check must not require a remote pepper secret before first deploy');
+    assert.doesNotMatch(packageJson.scripts['check'], /verify:remote-pepper/, 'check must stay runnable without remote Cloudflare credentials');
+
     const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
     const deployCheck = spawnSync(npmCommand, ['run', 'deploy:check'], {
         cwd: rootDir,

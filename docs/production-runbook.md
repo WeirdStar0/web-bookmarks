@@ -97,6 +97,30 @@ Rotate in this order — `wrangler secret put` deploys immediately and secret va
 
 Removing `PASSWORD_PEPPER` while v4 hashes exist locks the account — the recovery path is the password reset procedure (delete the `password` settings row, then re-initialize with `INITIAL_ADMIN_PASSWORD`). See `docs/password-v4-design.md` for the full format and semantics.
 
+### Verifying the pepper state
+
+Setting the secret is not the same as protecting the password. A stored hash only becomes peppered (v4) on the next successful login, and that migration write fails silently by design — `upgradeStoredPasswordIfUnchanged` swallows storage errors so a correct password is never rejected. A deployment can therefore sit in a "configured but not migrated" state with a green login response and no v4 hash, which leaves the D1 leak the pepper exists to prevent fully exploitable.
+
+Verify both halves, because the secret and the stored hash can disagree:
+
+```bash
+npx wrangler secret list
+npm run verify:remote-pepper
+```
+
+`secret list` prints secret names only; values are never readable. The pepper check queries only the stored hash's format, pepper id and length — never the hash or its salt — and reports one of four states:
+
+| `secret list` | Stored hash | State | Action |
+|---|---|---|---|
+| `PASSWORD_PEPPER` present | `v4` | protected | none |
+| `PASSWORD_PEPPER` present | `v3` / `v2` / `v1` | **half-enabled** — a D1 leak can still crack the password | log out and log in once, then re-run the check |
+| absent | `v4` | **locked out** — verification fails closed, so every login returns 401 | restore the pepper from your password manager, or use the password reset procedure above |
+| absent | `v3` / `v2` / `v1` | not enabled — valid, but weaker | optional: set the pepper |
+
+Only the two middle states fail. The last one is a documented, supported choice, so the check reports the available hardening instead of blocking a deployment.
+
+The check reads remote state, so it is deliberately not part of `npm run deploy:check`, which must stay local-only. Run it after deployment, or dispatch the `production-config` CI job, which is wired to run it because that job already holds `CLOUDFLARE_API_TOKEN`.
+
 ## 5. Release and smoke test
 
 ```bash
@@ -108,14 +132,16 @@ npm run verify:remote-migrations
 
 `deploy:check` is intentionally local-only (migration files and production bindings). `npm run deploy` applies pending remote migrations before publishing, so new code can never run against an outdated schema; the remote ledger is then confirmed after deployment with `verify:remote-migrations`, and a first deployment is never blocked by a database that has not been migrated yet.
 
-After deployment, verify the public login page and an unauthenticated API response without submitting credentials:
+After deployment, verify the public login page and an unauthenticated API response without submitting credentials. The Worker is served on **two independent entry points**, and a fault can affect one without affecting the other, so check both:
 
 ```text
+https://bookmark.weirdstarfun.com/
+https://bookmark.weirdstarfun.com/api/data
 https://web-bookmarks.weirdstar.workers.dev/
 https://web-bookmarks.weirdstar.workers.dev/api/data
 ```
 
-The second URL should return an unauthorized response. Complete an authenticated CRUD smoke test only with a designated test account, and remove test data afterward.
+Each `/api/data` URL should return an unauthorized response. The two hosts are separate origins with independent cookie scopes, so a session established on one is not sent to the other; if both are meant to stay reachable, verify the authenticated flow on each. Complete an authenticated CRUD smoke test only with a designated test account, and remove test data afterward.
 
 ## 6. CI and repository handoff
 
