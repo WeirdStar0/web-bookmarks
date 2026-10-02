@@ -46,3 +46,6 @@ temp/
 .agent/
 .claude/settings.local.json
 .workbuddy/
+
+# Spec workflow tooling (local only)
+.spec-workflow/
